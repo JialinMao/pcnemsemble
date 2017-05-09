@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Abstract for target distribution. 
-"""
 
 
 class Distribution(object):
-    def __init__(self, *args, **kwargs):
+
+    def __init__(self):
         pass
 
     def get_lnprob(self, x):

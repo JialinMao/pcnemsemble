@@ -1,8 +1,6 @@
 import numpy as np
 from .proposal import Proposal
 
-__all__ = ['WalkMove']
-
 
 class WalkMove(Proposal):
 
@@ -13,40 +11,28 @@ class WalkMove(Proposal):
         """
         assert s >= 2, "Walk move must use an ensemble size larger than 2"
         self.s = s
-        super(Proposal, self).__init__()
+        super(Proposal).__init__()
 
-    def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
+    def propose(self, curr_walker, ensemble, random=None):
         """
-        Give the proposed next position of walkers in `walkers_to_move`
         
-        :param walkers_to_move: 
-            position of the walker(s) to move, array of shape (n, dim)
+        :param curr_walker: 
+            position of the walker(s) we want to move, array of shape (n, dim)
         :param ensemble: 
-            ensemble from which we can calculate the covariance matrix for proposal.
-            If ens_idx is None, ensemble should be array of shape (m, dim), where each row is an available walker.
-            Otherwise ensemble should be array of shape (n + m, dim), with all walkers in the ensemble.
-        :param ens_idx:
-            Index of available walkers in the ensemble. See above for details.
+            ensemble from which we can choose  propose the move, array of shape (m, dim)
         :param random:
             random number generator. Use default if None.
     
         :return: proposed move of shape (Nc, dim)
         """
         rand = np.random.RandomState() if random is None else random
+        n, dim = curr_walker.shape[0]
+        m = ensemble.shape[0]
+        new_pos = np.empty([N, dim])
 
-        n, dim = walkers_to_move.shape
-        m = ensemble.shape[0] if ens_idx is None else len(ens_idx)
-
-        assert self.s <= m, "Not enough walkers to use %d ensembles" % self.s
-
-        new_pos = np.empty_like(walkers_to_move)
-
-        # NOTE: Is it OK if we choose n ensembles at once?
         for i in range(n):
-            # NOTE: Do we need to set replace = False?
-            available_idx = ens_idx or np.arange(m)
-            idx = rand.choice(available_idx, self.s)
+            idx = rand.choice(np.arange(m), self.s)
             cov = np.cov(ensemble[idx].T)
-            new_pos[i] = rand.multivariate_normal(walkers_to_move, cov)
+            new_pos[i] = rand.multivariate_normal(curr_walker, cov)
 
         return new_pos
