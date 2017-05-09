@@ -14,6 +14,6 @@ class Proposal(object):
 
     def ln_transition_prob(self, x, y):
         """
-        Log transition probability from x -> y. Return constant 1.0 if the proposal is symmetric.
+        Log transition probability from x -> y. Return constant 0.0 if the proposal is symmetric.
         """
-        return 1.0
+        return 0.0
