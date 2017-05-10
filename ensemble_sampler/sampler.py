@@ -1,7 +1,7 @@
 import numpy as np
 from emcee import autocorr
 
-from .history import History
+from history import History
 
 __all__ = ["Sampler"]
 
@@ -29,12 +29,14 @@ class Sampler(object):
         """
         self._history.reset()
 
-    def _sample(self, niter, **kwargs):
-
-        record_every = niter // self._history.max_len
+    def _sample(self, **kwargs):
+        """
+        Core sample function. Basically follows the M-H routine, i.e. propose, accept / reject, record. 
+        """
+        niter = self._history.niter
 
         for i in range(niter):
-            idx = self._random.choice(np.arange(self.nwalkers))
+            idx = self._random.choice(np.arange(self.nwalkers), kwargs.get('sample_size', 1))
             all_walkers = self._history.curr_pos
 
             curr_walker = all_walkers[idx]
@@ -46,33 +48,32 @@ class Sampler(object):
             ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
                 - (self.t_dist.get_lnprob(curr_walker) + self.proposal.ln_transition_prob(curr_walker, proposal))
 
-            accept = (np.log(self._random.uniform()) < min(0, ln_acc_prob))
+            accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < min(0, ln_acc_prob))
 
-            if accept:
-                self._history.curr_pos = proposal
+            self._history.curr_pos[idx][accept] = proposal[accept]
 
-            if i % record_every == 0:
-                self._history.update(walker_idx=idx, accepted=accept, lnprob=ln_acc_prob)
+            self._history.update(walker_idx=idx, chain=self._history.curr_pos[idx], accepted=accept, lnprob=ln_acc_prob)
 
-            return self._history.history
+        return self._history
 
-    def run_mcmc(self, p0, niter, record_every=1, rstate0=None, **kwargs):
+    def run_mcmc(self, niter, p0=None, rstate0=None, sample_every=1, **kwargs):
         """
         Iterate :func:`sample` for ``N`` iterations and return the result.
 
+        :param niter:
+            The number of steps to run.
         :param p0:
             The initial position vector.  Can also be None to resume from
             where :func:``run_mcmc`` left off the last time it executed.
-        :param niter:
-            The number of steps to run.
-        :param record_every:
-            How often do we write to self._chain.
         :param rstate0:
             The initial random state. Use default if None.
+        :param sample_every:
+            How often do we write to take the samples.
         """
         if rstate0 is not None:
             self._random.set_state(rstate0)
-        self._history.max_len = niter // record_every
+        self._history.niter = niter
+        self._history.sample_every = sample_every
         self._history.reset()
 
         if self._history.curr_pos is None:
@@ -82,7 +83,7 @@ class Sampler(object):
             else:
                 self._history.curr_pos = p0
 
-        result = self._sample(niter, **kwargs)
+        result = self._sample(**kwargs)
 
         return result
 

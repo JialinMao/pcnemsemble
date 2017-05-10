@@ -1,4 +1,8 @@
+from utils import *
 import numpy as np
+
+# NOTE: For plotting with seaborn. Can be commented out if do not have package installed.
+import seaborn as sns
 from pandas import DataFrame
 
 
@@ -6,26 +10,30 @@ class History(object):
     """
     History object, stores history of samples, lnprobs, accepted & extra_data
     """
-    def __init__(self, dim=1, nwalkers=1, max_len=1, extra={}):
+    def __init__(self, dim=1, nwalkers=1, niter=1, sample_every=None, extra={}):
         # NOTE: `extra` is not useful at all right now. Further modification needed.
         """
         Initiate a chain object. 
         Records sample history, lnprob history, acceptance history and extra information 
-        for max_len iterations. Dim, nwalkers, niter can be set later.
+        for niter iterations. Dim, nwalkers, niter, sample_every can be set later.
         
         :param dim: dimension of the sample space
         :param nwalkers: number of walkers
-        :param max_len: length of history
-        :param extra: extra information to record
+        :param niter: number of iterations 
+        :param sample_every: give statistics of every _ samples
+        :param extra: Dictionary {'blah': dim(blah)} of extra information to store.
         """
         self._dim = dim
         self._nwalkers = nwalkers
-        self._max_len = max_len
-        self._extra = extra
+        self._niter = niter
+        self._sample_every = sample_every
 
-        self._chain, self._lnprob, self._accepted, self._history, self.p = [None] * 5
+        self._name_to_dim = {'chain': dim, 'lnprob': 1, 'accepted': 1}
+        self._name_to_dim.update(extra)
 
         self._recording_idx = 0
+        self._history = None
+        self.p = None
 
         self.reset()
 
@@ -33,61 +41,92 @@ class History(object):
         """
         Reset history and current position to empty. 
         """
-        # NOTE: _chain has length self._max_len // self._nwalkers because we are moving
+        # NOTE: Second dimension has length self._niter // self._nwalkers because we are moving
         # one walker at a time. May need to refactor after parallelization.
-        self._chain = np.empty([self._nwalkers, self._dim, self._max_len // self._nwalkers], dtype=float)
-        self._lnprob = np.empty([self._nwalkers, self._max_len], dtype=float)
-        self._accepted = np.empty([self._nwalkers, ], dtype=int)
+        self._history = {k: np.zeros([self._nwalkers, self._niter // self._nwalkers, v])
+                         for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
         self._recording_idx = 0
-
-        self._update_history()
-
         self.p = None
 
     def get(self, name=None):
         """
-        Get `name` history from the `niter`-th iteration
-        
-        :param name: (optional) the name of the history to get, can be a list. Return all if None.
-        
-        :return: the history as required.
+        Get `name` from history, return all if name is None. 
         """
-        idx = self.history.keys() if name is None else name
-        return [self.history.get(i) for i in idx]
+        if not isinstance(name, list):
+            return self._history.get(name)
+        idx = self._history.keys() if name is None else name
+        return dict([(i, self._history.get(i)) for i in idx])
 
-    def update(self, walker_idx, accepted=False, lnprob=None):
-        if accepted:
-            self._accept(walker_idx)
-        self._update_chain(walker_idx)
-        self._update_lnprob(walker_idx, lnprob)
+    def get_flat(self, name=None):
+        """
+        Get history flattened along the `nwalkers` axis, of shape [niter, dim_of_data]. 
+        :param name: (optional) the name of the history to get, can be a list. Return all if None.
+        :return: Dictionary of inquired history {name: value}.
+        """
+        if not isinstance(name, list):
+            return self._history.get(name).reshape([self._niter, self._name_to_dim.get(name)])
+        idx = self._history.keys() if name is None else name
+        return dict([(i, self._history.get(i).reshape([self._niter, self._name_to_dim.get(i)])) for i in idx])
+
+    def get_every(self, get_every, name=None):
+        """
+        Return history taken every `get_every` steps. 
+        """
+        if not isinstance(name, list):
+            return self.get_flat(name)[::get_every]
+        idx = self._history.keys() if name is None else name
+        return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
+
+    def update(self, walker_idx, **kwargs):
+        """
+        Updating the information of _walker_idx_th walker.
+        Info is passed in through kwargs in the form name=data
+        """
+        i = self._recording_idx // self._nwalkers
+        for k in self._history.keys():
+            if kwargs.get(k).shape[0] == 0:
+                print kwargs.get(k), k
+            self._history[k][walker_idx, i, :] = kwargs.get(k)
         self._recording_idx += 1
 
-    def _accept(self, walker_idx):
+    def plot_trajectory(self, walker_id, dim, start_from=None):
         """
-        Record an acceptance of walker i. 
+        Plot the trajectory of selected walker in the selected dimension(s).
+        dim should be an integer array.
         """
-        self._accepted[walker_idx] += 1
+        assert isinstance(walker_id, (int, float)), "Trajectory plotting is supported for SINGLE WALKER only."
+        plot_trajectory(dim, self.get_flat('chain')[walker_id], start_from=start_from)
 
-    def _update_chain(self, walker_idx):
-        self._chain[walker_idx, :, self._recording_idx // self._nwalkers] = self.p[walker_idx]
-
-    def _update_lnprob(self, walker_id, lnprob):
-        self._lnprob[walker_id, self._recording_idx] = lnprob
-
-    def _update_history(self, extra=None):
+    def plot_hist(self, dim, walker_id=None, start_from=None):
         """
-        Update chain, lnprob, accepted & extras.
-         
-        :param extra: update extra if not None
+        Plot histogram of samples in selected dimension(s). 
+        Samples from walkers in `walker_id` will be stacked to give the final plot.
         """
-        extra = self._extra if extra is None else extra
-        self._history = {'chain': self._chain, 'lnprob': self._lnprob, 'accepted': self._accepted}
-        self._history.update(extra)
+        plot_hist(dim, self.get_flat('chain')[walker_id].reshape([-1, self._dim]), start_from=start_from)
+
+    def plot_scatter(self, dim):
+        """
+        Scattered plot for two chosen dimensions. Not sure whether this makes sense...
+        dim should be list of pairs of integers [[a_1, b_1], [a_2, b_2], ...]
+        """
+        for i in dim:
+            x, y = ['dim_%s' % int(i[k]+1) for k in range(2)]
+            chain = self.get_flat('chain')
+            df = DataFrame(np.vstack([chain[:, i[0]], chain[:, i[1]]]).T, columns=[x, y])
+            sns.jointplot(x=x, y=y, data=df)
+
+    @property
+    def history(self):
+        return self._history
+
+    @property
+    def acceptance_rate(self):
+        return np.sum(self._history.get('accepted')) / float(self.niter)
 
     @property
     def curr_pos(self):
         """
-        :return: current position of all walkers, array of shape [nwalkers, dim] 
+        Return current position of all walkers, array of shape [nwalkers, dim] 
         """
         return self.p
 
@@ -99,18 +138,17 @@ class History(object):
         self.p = p
 
     @property
-    def max_len(self):
+    def niter(self):
         """
         The length of history. Typically should be number_of_iterations // record_every. 
         """
-        return self._max_len
+        return self._niter
 
-    @max_len.setter
-    def max_len(self, N):
-        self._max_len = N
-
-    @property
-    def history(self):
-        self._update_history()
-        return self._history
+    @niter.setter
+    def niter(self, N):
+        """
+        Set the number of iterations, will trigger reset (including the current position).
+        """
+        self._niter = N
+        self.reset()
 
