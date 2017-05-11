@@ -22,7 +22,7 @@ class SPDE(Distribution):
         x must be of shape [batch_size, N]
         """
         p_u_i = (x[:, 1:] - x[:, :-1])**2 * self._N / 2.0 - (1 - (x[:, 1:] + x[:, :-1])**2)**2 / (2.0 * self._N)
-        return - np.sum(p_u_i, axis=0)
+        return - np.sum(p_u_i, axis=1)
 
     @property
     def N(self):

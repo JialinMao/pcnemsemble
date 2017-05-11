@@ -13,7 +13,7 @@ class History(object):
     """
     History object, stores history of samples, lnprobs, accepted & extra_data
     """
-    def __init__(self, dim=1, nwalkers=1, niter=1, sample_every=None, extra={}):
+    def __init__(self, dim=1, nwalkers=1, niter=1, extra={}):
         # NOTE: `extra` is not useful at all right now. Further modification needed.
         """
         Initiate a chain object. 
@@ -23,13 +23,11 @@ class History(object):
         :param dim: dimension of the sample space
         :param nwalkers: number of walkers
         :param niter: number of iterations 
-        :param sample_every: give statistics of every _ samples
         :param extra: Dictionary {'blah': dim(blah)} of extra information to store.
         """
         self._dim = dim
         self._nwalkers = nwalkers
         self._niter = niter
-        self._sample_every = sample_every
 
         self._name_to_dim = {'chain': dim, 'lnprob': 1, 'accepted': 1}
         self._name_to_dim.update(extra)
@@ -78,15 +76,18 @@ class History(object):
         idx = self._history.keys() if name is None else name
         return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
 
-    def update(self, walker_idx=slice(None), **kwargs):
+    def update(self, walker_idx=slice(None), itr=None, **kwargs):
         """
         Updating the information of _walker_idx_th walker.
         Info is passed in through kwargs in the form name=data
         """
-        i = self._recording_idx // self._nwalkers
+        i = itr
+        if i is None:
+            i = self._recording_idx // self._nwalkers
+            self._recording_idx += 1
         for k in self._history.keys():
-            self._history[k][walker_idx, i, :] = kwargs.get(k)
-        self._recording_idx += 1
+            if kwargs.get(k) is not None:
+                self._history[k][walker_idx, i, :] = kwargs.get(k)
 
     def move(self, new_pos, walker_idx=slice(None)):
         self._curr_pos[walker_idx] = new_pos
@@ -128,7 +129,7 @@ class History(object):
 
     @property
     def acceptance_rate(self):
-        return np.sum(self._history.get('accepted')) / float(self.niter)
+        return np.sum(self._history.get('accepted')) / float(self._nwalkers * self._niter)
 
     @property
     def history(self):

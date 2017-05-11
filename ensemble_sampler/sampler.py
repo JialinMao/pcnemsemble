@@ -35,6 +35,7 @@ class Sampler(object):
         niter = self._history.niter
 
         for i in range(niter*self.nwalkers):
+
             idx = np.asarray([i % self.nwalkers])
             curr_lnprob = self.t_dist.get_lnprob(self._history.curr_pos[idx])
             all_walkers = self._history.curr_pos
@@ -52,19 +53,18 @@ class Sampler(object):
 
             self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
 
-            if kwargs.get('verbose', False) and i <= 200:
+            if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
                 print '====iter %s====' % i
-                print 'idx', idx
-                print 'proposal', proposal
-                print 'lnprob', ln_acc_prob
                 print 'accept', accept
-                print 'curr_pos', self._history.curr_pos[idx]
 
-            self._history.update(walker_idx=idx, chain=self._history.curr_pos[idx], accepted=accept, lnprob=ln_acc_prob)
+            if kwargs.get('store', True) and i % kwargs.get('sample_every', 1) == 0:
+                self._history.update(walker_idx=idx, accepted=accept, lnprob=ln_acc_prob)
+                if i % self.nwalkers == 0:
+                    self._history.update(chain=self._history.curr_pos, itr=i // self.nwalkers)
 
         return self._history
 
-    def run_mcmc(self, niter, p0=None, rstate0=None, sample_every=1, **kwargs):
+    def run_mcmc(self, niter, p0=None, rstate0=None, **kwargs):
         """
         Iterate :func:`sample` for ``N`` iterations and return the result.
 
@@ -75,13 +75,10 @@ class Sampler(object):
             where :func:``run_mcmc`` left off the last time it executed.
         :param rstate0:
             The initial random state. Use default if None.
-        :param sample_every:
-            How often do we write to take the samples.
         """
         if rstate0 is not None:
             self._random.set_state(rstate0)
         self._history.niter = niter
-        self._history.sample_every = sample_every
         self._history.reset()
 
         if self._history.curr_pos is None:

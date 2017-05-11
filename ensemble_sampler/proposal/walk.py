@@ -6,16 +6,19 @@ __all__ = ['PCNWalkMove']
 
 class PCNWalkMove(Proposal):
 
-    def __init__(self, s, beta=1.0):
+    def __init__(self, s=None, beta=None, scale=1.0):
         """
         Propose with walk move        
-        :param s: number of ensemble to use
+        :param s: number of ensemble to use, if None, do not use ensemble, and use isotropic gaussian with given scale.
         :param beta: hyper-parameter related to sample scale. Should be adjusted to get a good acceptance ratio. 
         """
-        assert s >= 2, "Walk move must use an ensemble size larger than 2"
-        assert 0.0 <= beta <= 1.0, "beta must be in [0, 1]"
+        if s is not None:
+            assert s >= 2, "Walk move must use an ensemble size larger than 2"
+            if beta is not None:
+                assert 0.0 <= beta <= 1.0, "beta must be in [0, 1]"
         self.s = s
         self.beta = beta
+        self.scale = scale
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
@@ -38,6 +41,7 @@ class PCNWalkMove(Proposal):
         :return: proposed move of shape (Nc, dim)
         """
         rand = np.random.RandomState() if random is None else random
+        scale = kwargs.get('scale', self.scale)
         beta = kwargs.get('beta', self.beta)
         s = kwargs.get('s', self.s)
 
@@ -50,10 +54,16 @@ class PCNWalkMove(Proposal):
 
         # NOTE: Is it OK if we choose n ensembles at once?
         for i in range(n):
-            available_idx = ens_idx if ens_idx is not None else np.arange(m)
-            idx = rand.choice(available_idx, s, replace=False)
-            cov = np.cov(ensemble[idx].T)
-            new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] \
-                         + beta * rand.multivariate_normal(np.zeros_like(walkers_to_move[i]), cov)
+            if self.s is not None:
+                available_idx = ens_idx if ens_idx is not None else np.arange(m)
+                idx = rand.choice(available_idx, s, replace=False)
+                cov = np.cov(ensemble[idx].T)
+            else:
+                cov = np.identity(dim)
+            if beta is not None:
+                new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] \
+                             + beta * rand.multivariate_normal(np.zeros_like(walkers_to_move[i]), cov)
+            else:
+                new_pos[i] = rand.multivariate_normal(walkers_to_move[i], scale**2 * cov)
 
         return new_pos
