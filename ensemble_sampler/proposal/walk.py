@@ -50,10 +50,10 @@ class PCNWalkMove(Proposal):
 
         # NOTE: Is it OK if we choose n ensembles at once?
         for i in range(n):
-            # NOTE: Do we need to set replace = False?
             available_idx = ens_idx if ens_idx is not None else np.arange(m)
-            idx = rand.choice(available_idx, s)
+            idx = rand.choice(available_idx, s, replace=False)
             cov = np.cov(ensemble[idx].T)
-            new_pos[i] = beta * rand.multivariate_normal(np.sqrt(1 - beta ** 2) * walkers_to_move[i], cov)
+            new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] \
+                         + beta * rand.multivariate_normal(np.zeros_like(walkers_to_move[i]), cov)
 
         return new_pos

@@ -24,7 +24,7 @@ class MultivariateGaussian(Distribution):
         self._mu = mu
         self._icov = icov
         if icov is None:
-            assert cov is not None, "Covariance or inverse covariance must be given."
+            assert cov is not None, "Either covariance or inverse covariance must be given."
             self._icov = np.linalg.inv(cov)
         super(MultivariateGaussian, self).__init__()
 

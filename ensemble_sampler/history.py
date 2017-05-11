@@ -1,5 +1,8 @@
+from __future__ import division
+
 from utils import *
 import numpy as np
+from emcee import autocorr
 
 # NOTE: For plotting with seaborn. Can be commented out if do not have package installed.
 import seaborn as sns
@@ -41,9 +44,7 @@ class History(object):
         """
         Reset history and current position to empty. 
         """
-        # NOTE: Second dimension has length self._niter // self._nwalkers because we are moving
-        # one walker at a time. May need to refactor after parallelization.
-        self._history = {k: np.zeros([self._nwalkers, self._niter // self._nwalkers, v])
+        self._history = {k: np.zeros([self._nwalkers, self._niter, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
         self._recording_idx = 0
         self.p = None
@@ -64,9 +65,9 @@ class History(object):
         :return: Dictionary of inquired history {name: value}.
         """
         if not isinstance(name, list):
-            return self._history.get(name).reshape([self._niter, self._name_to_dim.get(name)])
+            return self._history.get(name).reshape([-1, self._name_to_dim.get(name)])
         idx = self._history.keys() if name is None else name
-        return dict([(i, self._history.get(i).reshape([self._niter, self._name_to_dim.get(i)])) for i in idx])
+        return dict([(i, self._history.get(i).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
 
     def get_every(self, get_every, name=None):
         """
@@ -84,8 +85,6 @@ class History(object):
         """
         i = self._recording_idx // self._nwalkers
         for k in self._history.keys():
-            if kwargs.get(k).shape[0] == 0:
-                print kwargs.get(k), k
             self._history[k][walker_idx, i, :] = kwargs.get(k)
         self._recording_idx += 1
 
@@ -102,7 +101,7 @@ class History(object):
         Plot histogram of samples in selected dimension(s). 
         Samples from walkers in `walker_id` will be stacked to give the final plot.
         """
-        plot_hist(dim, self.get_flat('chain')[walker_id].reshape([-1, self._dim]), start_from=start_from)
+        plot_hist(dim, self.get_flat('chain')[walker_id], start_from=start_from)
 
     def plot_scatter(self, dim):
         """
@@ -116,8 +115,13 @@ class History(object):
             sns.jointplot(x=x, y=y, data=df)
 
     @property
-    def history(self):
-        return self._history
+    def auto_corr(self, low=10, high=None, step=1, c=10, fast=False):
+        """
+        Adopted from emcee.ensemble. See emcee docs for detail. 
+        """
+        return autocorr.integrated_time(np.mean(self.get("chain"), axis=0), axis=0,
+                                        low=low, high=high, step=step, c=c,
+                                        fast=fast)
 
     @property
     def acceptance_rate(self):
@@ -136,6 +140,10 @@ class History(object):
         Set current position to p. 
         """
         self.p = p
+
+    @property
+    def history(self):
+        return self._history
 
     @property
     def niter(self):

@@ -1,5 +1,4 @@
 import numpy as np
-from emcee import autocorr
 
 from history import History
 
@@ -35,8 +34,9 @@ class Sampler(object):
         """
         niter = self._history.niter
 
-        for i in range(niter):
+        for i in range(niter*self.nwalkers):
             idx = self._random.choice(np.arange(self.nwalkers), kwargs.get('sample_size', 1))
+            curr_lnprob = self.t_dist.get_lnprob(self._history.curr_pos[idx])
             all_walkers = self._history.curr_pos
 
             curr_walker = all_walkers[idx]
@@ -46,7 +46,7 @@ class Sampler(object):
             proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
 
             ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
-                - (self.t_dist.get_lnprob(curr_walker) + self.proposal.ln_transition_prob(curr_walker, proposal))
+                          - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
 
             accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < min(0, ln_acc_prob))
 
@@ -86,14 +86,6 @@ class Sampler(object):
         result = self._sample(**kwargs)
 
         return result
-
-    def get_autocorr(self, low=10, high=None, step=1, c=10, fast=False):
-        """
-        Adopted from emcee.ensemble. See emcee docs for detail. 
-        """
-        return autocorr.integrated_time(np.mean(self._history.get("chain"), axis=0), axis=0,
-                                        low=low, high=high, step=step, c=c,
-                                        fast=fast)
 
     @property
     def history(self):
