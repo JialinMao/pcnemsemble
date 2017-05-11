@@ -35,7 +35,7 @@ class Sampler(object):
         niter = self._history.niter
 
         for i in range(niter*self.nwalkers):
-            idx = self._random.choice(np.arange(self.nwalkers), kwargs.get('sample_size', 1))
+            idx = np.asarray([i % self.nwalkers])
             curr_lnprob = self.t_dist.get_lnprob(self._history.curr_pos[idx])
             all_walkers = self._history.curr_pos
 
@@ -50,7 +50,15 @@ class Sampler(object):
 
             accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < min(0, ln_acc_prob))
 
-            self._history.curr_pos[idx][accept] = proposal[accept]
+            self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
+
+            if kwargs.get('verbose', False) and i <= 200:
+                print '====iter %s====' % i
+                print 'idx', idx
+                print 'proposal', proposal
+                print 'lnprob', ln_acc_prob
+                print 'accept', accept
+                print 'curr_pos', self._history.curr_pos[idx]
 
             self._history.update(walker_idx=idx, chain=self._history.curr_pos[idx], accepted=accept, lnprob=ln_acc_prob)
 

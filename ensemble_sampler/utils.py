@@ -28,7 +28,7 @@ def plot_trajectory(dim, history, start_from=0):
     fig, axs = plt.subplots(nrows, 2, figsize=(15, 9))
     fig.suptitle("Sample history trajectory, dim=%s" % dim)
     for i in range(len(dim)):
-        idx = i if n == 2 else (i // 2, i % 2)
+        idx = i if n == 1 or n == 2 else (i // 2, i % 2)
         axs[idx].plot(np.arange(N - start_from), history[start_from:, i])
         axs[idx].set_title("Dim %s history" % int(i + 1))
     plt.show()

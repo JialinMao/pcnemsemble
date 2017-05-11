@@ -18,7 +18,11 @@ class SPDE(Distribution):
         super(SPDE, self).__init__()
 
     def get_lnprob(self, x):
-        return - np.sum((x[1:] - x[:-1])**2 * self._N / 2.0 - (1 - (x[1:] + x[:-1])**2)**2 / (2.0 * self._N))
+        """
+        x must be of shape [batch_size, N]
+        """
+        p_u_i = (x[:, 1:] - x[:, :-1])**2 * self._N / 2.0 - (1 - (x[:, 1:] + x[:, :-1])**2)**2 / (2.0 * self._N)
+        return - np.sum(p_u_i, axis=0)
 
     @property
     def N(self):

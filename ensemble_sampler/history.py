@@ -36,7 +36,7 @@ class History(object):
 
         self._recording_idx = 0
         self._history = None
-        self.p = None
+        self._curr_pos = None
 
         self.reset()
 
@@ -47,7 +47,7 @@ class History(object):
         self._history = {k: np.zeros([self._nwalkers, self._niter, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
         self._recording_idx = 0
-        self.p = None
+        self._curr_pos = None
 
     def get(self, name=None):
         """
@@ -78,7 +78,7 @@ class History(object):
         idx = self._history.keys() if name is None else name
         return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
 
-    def update(self, walker_idx, **kwargs):
+    def update(self, walker_idx=slice(None), **kwargs):
         """
         Updating the information of _walker_idx_th walker.
         Info is passed in through kwargs in the form name=data
@@ -88,15 +88,18 @@ class History(object):
             self._history[k][walker_idx, i, :] = kwargs.get(k)
         self._recording_idx += 1
 
-    def plot_trajectory(self, walker_id, dim, start_from=None):
+    def move(self, new_pos, walker_idx=slice(None)):
+        self._curr_pos[walker_idx] = new_pos
+
+    def plot_trajectory(self, walker_id, dim, start_from=0):
         """
         Plot the trajectory of selected walker in the selected dimension(s).
         dim should be an integer array.
         """
         assert isinstance(walker_id, (int, float)), "Trajectory plotting is supported for SINGLE WALKER only."
-        plot_trajectory(dim, self.get_flat('chain')[walker_id], start_from=start_from)
+        plot_trajectory(dim, self.get('chain')[walker_id], start_from=start_from)
 
-    def plot_hist(self, dim, walker_id=None, start_from=None):
+    def plot_hist(self, dim, walker_id=None, start_from=0):
         """
         Plot histogram of samples in selected dimension(s). 
         Samples from walkers in `walker_id` will be stacked to give the final plot.
@@ -112,7 +115,7 @@ class History(object):
             x, y = ['dim_%s' % int(i[k]+1) for k in range(2)]
             chain = self.get_flat('chain')
             df = DataFrame(np.vstack([chain[:, i[0]], chain[:, i[1]]]).T, columns=[x, y])
-            sns.jointplot(x=x, y=y, data=df)
+            sns.jointplot(x=x, y=y, data=df, )
 
     @property
     def auto_corr(self, low=10, high=None, step=1, c=10, fast=False):
@@ -128,22 +131,16 @@ class History(object):
         return np.sum(self._history.get('accepted')) / float(self.niter)
 
     @property
+    def history(self):
+        return self._history
+
+    @property
     def curr_pos(self):
-        """
-        Return current position of all walkers, array of shape [nwalkers, dim] 
-        """
-        return self.p
+        return self._curr_pos
 
     @curr_pos.setter
     def curr_pos(self, p):
-        """
-        Set current position to p. 
-        """
-        self.p = p
-
-    @property
-    def history(self):
-        return self._history
+        self._curr_pos = p
 
     @property
     def niter(self):
