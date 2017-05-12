@@ -8,9 +8,10 @@ class PCNWalkMove(Proposal):
 
     def __init__(self, s=None, beta=None, scale=1.0):
         """
-        Propose with walk move        
-        :param s: number of ensemble to use, if None, do not use ensemble, and use isotropic gaussian with given scale.
-        :param beta: hyper-parameter related to sample scale. Should be adjusted to get a good acceptance ratio. 
+        Propose generalized ensemble walk move.
+        Use ensemble covariance matrix if s is not None, otherwise use identity matrix.
+        Use the strategy X(t+1) = sqrt(1 - beta ** 2) X(t) + beta * N(0, Cov) if beta is not None,
+        otherwise use simple random walk proposal with scale _scale_.
         """
         if s is not None:
             assert s >= 2, "Walk move must use an ensemble size larger than 2"
@@ -23,10 +24,6 @@ class PCNWalkMove(Proposal):
 
     def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
         """
-        Give the proposed next position of walkers in `walkers_to_move`
-        based on X(t+1) = sqrt(1 - beta ** 2) X(t) + beta * N(0, Cov(ensemble)).
-        When beta = 1.0, just the isotropic gaussian random walk proposal.
-        
         :param walkers_to_move: 
             position of the walker(s) to move, array of shape (n, dim)
         :param ensemble: 

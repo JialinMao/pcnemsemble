@@ -14,7 +14,6 @@ class History(object):
     History object, stores history of samples, lnprobs, accepted & extra_data
     """
     def __init__(self, dim=1, nwalkers=1, niter=1, extra={}):
-        # NOTE: `extra` is not useful at all right now. Further modification needed.
         """
         Initiate a chain object. 
         Records sample history, lnprob history, acceptance history and extra information 
@@ -69,7 +68,7 @@ class History(object):
 
     def get_every(self, get_every, name=None):
         """
-        Return history taken every `get_every` steps. 
+        Return (flattened) history taken every `get_every` steps. 
         """
         if not isinstance(name, list):
             return self.get_flat(name)[::get_every]
