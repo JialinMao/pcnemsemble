@@ -9,9 +9,9 @@ class PCNWalkMove(Proposal):
     def __init__(self, s=None, beta=None, scale=1.0):
         """
         Propose generalized ensemble walk move.
-        Use ensemble covariance matrix if s is not None, otherwise use identity matrix.
-        Use the strategy X(t+1) = sqrt(1 - beta ** 2) X(t) + beta * N(0, Cov) if beta is not None,
-        otherwise use simple random walk proposal with scale _scale_.
+        Use covariance matrix calculated from ensemble if `s` is not None, otherwise use identity matrix.
+        Use the strategy X(t+1) = sqrt(1 - beta ** 2) X(t) + beta * N(0, Cov) if `beta` is not None,
+        otherwise use simple random walk proposal with scale `scale`.
         """
         if s is not None:
             assert s >= 2, "Walk move must use an ensemble size larger than 2"
@@ -47,20 +47,34 @@ class PCNWalkMove(Proposal):
 
         assert s <= m, "Not enough walkers to use %d ensembles" % s
 
-        new_pos = np.zeros_like(walkers_to_move)
+        # new_pos = np.zeros_like(walkers_to_move)
 
-        # NOTE: Is it OK if we choose n ensembles at once?
+        available_idx = ens_idx if ens_idx is not None else np.arange(m)
+        # NOTE: probably should use replace=False. Probably that does not matter, not sure.
+        idx = rand.choice(available_idx, [n, s]) if s is not None else None
+
+        if self.s is not None:
+            x = ensemble[idx] - np.mean(ensemble[idx], axis=1)[:, None, :]
+            w = rand.normal(size=[n, 1, s])
+            proposal = np.einsum("ijk, ikl -> ijl", w, x).squeeze()
+        else:
+            proposal = rand.normal(size=[n, dim])
+        if beta is not None:
+            new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
+        else:
+            new_pos = walkers_to_move + scale * proposal
+        """
         for i in range(n):
             if self.s is not None:
-                available_idx = ens_idx if ens_idx is not None else np.arange(m)
-                idx = rand.choice(available_idx, s, replace=False)
-                cov = np.cov(ensemble[idx].T)
+                x = ensemble[idx[i]] - np.mean(ensemble[idx[i]], axis=0)
+                z = rand.normal(size=s)
+                proposal = np.dot(z, x)
             else:
-                cov = np.identity(dim)
+                # NOTE: shall we use scale here or later?
+                proposal = rand.normal()
             if beta is not None:
-                new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] \
-                             + beta * rand.multivariate_normal(np.zeros_like(walkers_to_move[i]), cov)
+                new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] + beta * proposal
             else:
-                new_pos[i] = rand.multivariate_normal(walkers_to_move[i], scale**2 * cov)
-
+                new_pos[i] = walkers_to_move[i] + scale * proposal
+        """
         return new_pos

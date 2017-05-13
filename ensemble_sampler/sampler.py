@@ -1,4 +1,5 @@
 import numpy as np
+import timeit
 
 from history import History
 
@@ -28,12 +29,14 @@ class Sampler(object):
         """
         self._history.reset()
 
-    def run_mcmc(self, niter, p0=None, rstate0=None, **kwargs):
+    def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, **kwargs):
         """
         Iterate :func:`sample` for ``N`` iterations and return the result.
 
         :param niter:
             The number of steps to run.
+        :param batch_size:
+            In each iteration move `batch_size` walkers simultaneously using all other walkers as ensemble.
         :param p0:
             The initial position vector.  Can also be None to resume from
             where :func:``run_mcmc`` left off the last time it executed.
@@ -56,33 +59,37 @@ class Sampler(object):
             else:
                 self._history.curr_pos = p0
 
-        for i in range(niter*self.nwalkers):
+        for i in range(niter):
+            acceptances= np.empty([self.nwalkers, 1])
+            lnprobs = np.empty([self.nwalkers, 1])
+            for j in range(int(np.ceil(self.nwalkers // batch_size))):
+                start = (j * batch_size) % self.nwalkers
+                idx = np.remainder(start + np.arange(batch_size), self.nwalkers)
+                all_walkers = self._history.curr_pos
 
-            idx = np.atleast_1d(i % self.nwalkers)
-            all_walkers = self._history.curr_pos
+                curr_walker = all_walkers[idx]
+                curr_lnprob = self.t_dist.get_lnprob(curr_walker)
+                ensemble = all_walkers
+                ens_idx = np.delete(np.arange(self.nwalkers), idx)
 
-            curr_walker = all_walkers[idx]
-            curr_lnprob = self.t_dist.get_lnprob(curr_walker)
-            ensemble = all_walkers
-            ens_idx = np.delete(np.arange(self.nwalkers), idx)
+                proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
 
-            proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
+                ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
+                              - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
 
-            ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
-                          - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
+                accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < np.minimum(0, ln_acc_prob))
 
-            accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < min(0, ln_acc_prob))
+                acceptances[idx] = np.array(accept, dtype=int)[:, None]
+                lnprobs[idx] = ln_acc_prob[:, None]
 
-            self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
+                self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
 
             if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
                 print '====iter %s====' % i
-                print 'accept', accept
+                print 'accept', acceptances
 
             if kwargs.get('store', True) and i % kwargs.get('store_every', 1) == 0:
-                self._history.update(walker_idx=idx, accepted=accept, lnprob=ln_acc_prob)
-                if i % self.nwalkers == 0:
-                    self._history.update(chain=self._history.curr_pos, itr=i // self.nwalkers)
+                self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
 
         return self._history
 

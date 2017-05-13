@@ -15,7 +15,7 @@ class SPDE(Distribution):
         :param N: the number of discretization steps to use
         """
         self._N = N
-        super(SPDE, self).__init__()
+        super(SPDE, self).__init__(N=N)
 
     def get_lnprob(self, x):
         """
@@ -23,11 +23,3 @@ class SPDE(Distribution):
         """
         p_u_i = (x[:, 1:] - x[:, :-1])**2 * self._N / 2.0 - (1 - (x[:, 1:] + x[:, :-1])**2)**2 / (2.0 * self._N)
         return - np.sum(p_u_i, axis=1)
-
-    @property
-    def N(self):
-        return self._N
-
-    @N.setter
-    def N(self, N):
-        self._N = N

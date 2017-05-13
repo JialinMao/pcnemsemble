@@ -6,8 +6,26 @@ Abstract for target distribution.
 
 
 class Distribution(object):
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, **kwargs):
+        """
+        for simple distributions, can just pass in lnprob function
+        with the keyword 'lnprob' & arguments.
+        """
+        self.f = kwargs.get('lnprob', None)
+        self.args = kwargs
+        try:
+            del self.args['lnprob']
+        except KeyError:
+            pass
 
     def get_lnprob(self, x):
-        raise NotImplementedError
+        if self.f is not None:
+            return self.f(x, self.args)
+        else:
+            raise NotImplementedError
+
+    def set(self, k, v):
+        try:
+            self.args[k] = v
+        except KeyError:
+            print "No args named %s" % k

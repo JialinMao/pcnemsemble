@@ -21,34 +21,15 @@ class MultivariateGaussian(Distribution):
         :param dim (optional): 
             dimension of the gaussian, used to check the eligibility of input parameter
         """
+        assert len(mu) == dim, "input shape not match, %d != %d" % (mu.shape[0], dim)
         self._mu = mu
         self._icov = icov
         if icov is None:
             assert cov is not None, "Either covariance or inverse covariance must be given."
             self._icov = np.linalg.inv(cov)
-        super(MultivariateGaussian, self).__init__()
+        super(MultivariateGaussian, self).__init__(mu=mu, icov=icov)
 
     def get_lnprob(self, x):
-        assert x.shape[1] == self._mu.shape[0], "input shape not match, %d != %d" % (x.shape[0], self._mu.shape[0])
         diff = x - self._mu
         return -np.diag(np.dot(diff, np.dot(self._icov, diff.T))) / 2.0
-
-    @property
-    def mu(self):
-        return self._mu
-
-    @mu.setter
-    def mu(self, mu):
-        self._mu = mu
-
-    @property
-    def icov(self):
-        return self._icov
-
-    @icov.setter
-    def icov(self, icov=None, cov=None):
-        self._icov = icov
-        if icov is None:
-            assert cov is not None, "Covariance or inverse covariance must be given."
-            self._icov = np.linalg.inv(cov)
 

@@ -15,7 +15,7 @@ class Rosenbrock(Distribution):
         """
         self.a = a
         self.b = b
-        super(Rosenbrock, self).__init__()
+        super(Rosenbrock, self).__init__(a=a, b=b)
 
     def get_lnprob(self, x):
         x_1, x_2 = x[:, 0], x[:, 1]

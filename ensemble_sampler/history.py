@@ -53,7 +53,11 @@ class History(object):
         if not isinstance(name, list):
             return self._history.get(name)
         idx = self._history.keys() if name is None else name
-        return dict([(i, self._history.get(i)) for i in idx])
+        try:
+            return dict([(i, self._history[i]) for i in idx])
+        except KeyError, err:
+            print err
+            print 'Supported keys: %s' % str(self._history.keys())
 
     def get_flat(self, name=None):
         """
@@ -64,7 +68,11 @@ class History(object):
         if not isinstance(name, list):
             return self._history.get(name).reshape([-1, self._name_to_dim.get(name)])
         idx = self._history.keys() if name is None else name
-        return dict([(i, self._history.get(i).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
+        try:
+            return dict([(i, self._history.get(i).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
+        except KeyError, err:
+            print err
+            print 'Supported keys: %s' % str(self._history.keys())
 
     def get_every(self, get_every, name=None):
         """
@@ -73,7 +81,11 @@ class History(object):
         if not isinstance(name, list):
             return self.get_flat(name)[::get_every]
         idx = self._history.keys() if name is None else name
-        return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
+        try:
+            return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
+        except KeyError, err:
+            print err
+            print 'Supported keys: %s' % str(self._history.keys())
 
     def update(self, walker_idx=slice(None), itr=None, **kwargs):
         """
@@ -82,7 +94,7 @@ class History(object):
         """
         i = itr
         if i is None:
-            i = self._recording_idx // self._nwalkers
+            i = self._recording_idx
             self._recording_idx += 1
         for k in self._history.keys():
             if kwargs.get(k) is not None:
@@ -115,10 +127,9 @@ class History(object):
             x, y = ['dim_%s' % int(i[k]+1) for k in range(2)]
             chain = self.get_flat('chain')
             df = DataFrame(np.vstack([chain[:, i[0]], chain[:, i[1]]]).T, columns=[x, y])
-            sns.jointplot(x=x, y=y, data=df, )
+            sns.jointplot(x=x, y=y, data=df)
 
-    @property
-    def auto_corr(self, low=10, high=None, step=1, c=10, fast=False):
+    def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
         """
         Adopted from emcee.ensemble. See emcee docs for detail. 
         """
@@ -128,7 +139,7 @@ class History(object):
 
     @property
     def acceptance_rate(self):
-        return np.sum(self._history.get('accepted')) / float(self._nwalkers * self._niter)
+        return np.sum(self._history.get('accepted'), axis=1) / float(self._niter)
 
     @property
     def history(self):
