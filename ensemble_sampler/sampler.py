@@ -47,6 +47,7 @@ class Sampler(object):
              verbose: print every _print_every_ iteration. For debugging purpose.
              store: store to history every _store_every_ iterations.
         """
+        assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
         if rstate0 is not None:
             self._random.set_state(rstate0)
         self._history.niter = niter
@@ -60,7 +61,7 @@ class Sampler(object):
                 self._history.curr_pos = p0
 
         for i in range(niter):
-            acceptances= np.empty([self.nwalkers, 1])
+            acceptances = np.empty([self.nwalkers, 1])
             lnprobs = np.empty([self.nwalkers, 1])
             for j in range(int(np.ceil(self.nwalkers // batch_size))):
                 start = (j * batch_size) % self.nwalkers
@@ -86,7 +87,7 @@ class Sampler(object):
 
             if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
                 print '====iter %s====' % i
-                print 'accept', acceptances
+                print 'accepted %d proposals' % np.sum(acceptances, dtype=int)
 
             if kwargs.get('store', True) and i % kwargs.get('store_every', 1) == 0:
                 self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)

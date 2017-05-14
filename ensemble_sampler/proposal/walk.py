@@ -6,7 +6,7 @@ __all__ = ['PCNWalkMove']
 
 class PCNWalkMove(Proposal):
 
-    def __init__(self, s=None, beta=None, scale=1.0):
+    def __init__(self, s=None, beta=None, scale=1.0, symmetric=False):
         """
         Propose generalized ensemble walk move.
         Use covariance matrix calculated from ensemble if `s` is not None, otherwise use identity matrix.
@@ -20,6 +20,7 @@ class PCNWalkMove(Proposal):
         self.s = s
         self.beta = beta
         self.scale = scale
+        self.symmetric = symmetric
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
@@ -47,8 +48,6 @@ class PCNWalkMove(Proposal):
 
         assert s <= m, "Not enough walkers to use %d ensembles" % s
 
-        # new_pos = np.zeros_like(walkers_to_move)
-
         available_idx = ens_idx if ens_idx is not None else np.arange(m)
         # NOTE: probably should use replace=False. Probably that does not matter, not sure.
         idx = rand.choice(available_idx, [n, s]) if s is not None else None
@@ -63,18 +62,11 @@ class PCNWalkMove(Proposal):
             new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
         else:
             new_pos = walkers_to_move + scale * proposal
-        """
-        for i in range(n):
-            if self.s is not None:
-                x = ensemble[idx[i]] - np.mean(ensemble[idx[i]], axis=0)
-                z = rand.normal(size=s)
-                proposal = np.dot(z, x)
-            else:
-                # NOTE: shall we use scale here or later?
-                proposal = rand.normal()
-            if beta is not None:
-                new_pos[i] = np.sqrt(1 - beta ** 2) * walkers_to_move[i] + beta * proposal
-            else:
-                new_pos[i] = walkers_to_move[i] + scale * proposal
-        """
+
         return new_pos
+
+    def ln_transition_prob(self, x, y):
+        if self.beta is None or self.symmetric:
+            return 0.0
+        diff = y - np.sqrt(1 - self.beta ** 2) * x
+        return -np.sum(np.power(diff, 2), axis=1) / (2.0 * self.beta)
