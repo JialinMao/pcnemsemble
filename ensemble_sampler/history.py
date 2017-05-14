@@ -111,12 +111,12 @@ class History(object):
         assert isinstance(walker_id, (int, float)), "Trajectory plotting is supported for SINGLE WALKER only."
         plot_trajectory(dim, self.get('chain')[walker_id], start_from=start_from)
 
-    def plot_hist(self, dim, walker_id=None, start_from=0):
+    def plot_hist(self, dim, start_from=0):
         """
         Plot histogram of samples in selected dimension(s). 
         Samples from walkers in `walker_id` will be stacked to give the final plot.
         """
-        plot_hist(dim, self.get_flat('chain')[walker_id], start_from=start_from)
+        plot_hist(dim, self.get_flat('chain').T, start_from=start_from)
 
     def plot_scatter(self, dim):
         """
