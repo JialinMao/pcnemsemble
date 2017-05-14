@@ -6,7 +6,7 @@ __all__ = ['PCNWalkMove']
 
 class PCNWalkMove(Proposal):
 
-    def __init__(self, s=None, beta=None, scale=1.0, symmetric=False):
+    def __init__(self, s=None, beta=None, scale=1.0, symmetric=True):
         """
         Propose generalized ensemble walk move.
         Use covariance matrix calculated from ensemble if `s` is not None, otherwise use identity matrix.
