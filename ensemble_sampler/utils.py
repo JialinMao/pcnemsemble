@@ -3,12 +3,11 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import timeit
 from emcee.autocorr import *
+import cPickle
 
-from .distribution import *
-from .sampler import *
-from .proposal import *
+import ensemble_sampler as es
 
-__all__ = ['plot_hist', 'plot_trajectory', 'run_spde']
+__all__ = ['plot_hist', 'plot_trajectory', 'run']
 
 
 def plot_hist(dim, history, start_from=None):
@@ -43,49 +42,39 @@ def plot_trajectory(dim, history, start_from=0):
     plt.show()
 
 
-def run_spde(dim, proposal, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100):
-    t_dist = SPDE(N=dim)
-    sampler = Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
-
+def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
+        title='', verbose=False, print_every=200, plot=False, save_dir=None, save_every=1):
     acc_r = 0.0
     for i in range(n):
         sampler.reset()
         p0 = np.random.randn(dim*nwalkers).reshape([nwalkers, dim])
         if pre > 0:
-            hist = sampler.run_mcmc(pre, batch_size=batch_size, p0=p0, verbose=False)
-            p0 = hist.curr_pos
-            sampler.reset()
+            s = es.Sampler(dim=dim, t_dist=sampler.t_dist, proposal=es.PCNWalkMove(s=None, scale=0.2), nwalkers=nwalkers)
+            p0 = s.run_mcmc(pre, batch_size=batch_size, p0=p0, verbose=False).curr_pos
         start = timeit.default_timer()
-        hist = sampler.run_mcmc(niters, batch_size=batch_size, p0=p0, verbose=False)
+        hist = sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0, verbose=verbose, print_every=print_every)
         print 'finishes loop %d in %.2f seconds' % (i, float(timeit.default_timer() - start))
-        acc_r += float(100*hist.acceptance_rate.mean())
-        # print 'avg accept rate: %.2f%s' % (float(100*hist.acceptance_rate.mean()), '%')
+        acc_curr_iter = float(100*hist.acceptance_rate.mean())
+        acc_r += acc_curr_iter
         try:
-            print 'auto-correlation time: %s' % hist.auto_corr()
-        except AutocorrError:
-            pass
-    print 'avg_acc_r: %.2f%s' % (float(acc_r) / 5.0, '%')
-
-
-def run_rosenbrock(proposal, batch_size=50, niters=1000, nwalkers=100, n=5, pre=0, title=''):
-    sampler = Sampler(dim=2, t_dist=Rosenbrock(), proposal=proposal, nwalkers=nwalkers)
-
-    acc_r = 0.0
-    for i in range(n):
-        sampler.reset()
-        p0 = np.random.randn(2*nwalkers).reshape([nwalkers, 2])
-        if pre > 0:
-            s = Sampler(dim=2, t_dist=Rosenbrock(), proposal=PCNWalkMove(s=None, scale=0.2), nwalkers=nwalkers)
-            p0 = s.run_mcmc(pre, batch_size=batch_size, p0=p0).curr_pos
-        start = timeit.default_timer()
-        hist = sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0)
-        print 'finishes loop %d in %.2f seconds' % (i, float(timeit.default_timer() - start))
-        acc_r += float(100*hist.acceptance_rate.mean())
-        # print 'avg accept rate: %.2f%s' % (float(100*hist.acceptance_rate.mean()), '%')
-        try:
-            print 'auto-correlation time: %s' % hist.auto_corr()
+            auto_corr = hist.auto_corr()
         except AutocorrError, err:
-            pass
-    hist.plot_scatter(dim=[[0, 1]])
-    sns.plt.title(title)
-    print 'avg_acc_r: %.2f%s' % (float(acc_r) / 5.0, '%')
+            auto_corr = err
+        finally:
+            print 'auto-correlation time: %s' % auto_corr
+
+        if save_dir is not None and i % save_every == 0:
+            print 'writing to %s.pkl...' % title
+            with open(save_dir+title+'_'+str(i)+'.pkl', 'wb') as f:
+                cPickle.dump({'auto_corr': auto_corr,
+                              'acceptance_rate': acc_curr_iter}, f)
+
+    print 'avg_acc_r: %.2f%s' % (float(acc_r) / float(n), '%')
+
+    if plot:
+        img = hist.plot_scatter(dim=[[0, 1]])
+        sns.plt.title(title)
+        fig = img.get_fig()
+        fig.savefig(title)
+
+
