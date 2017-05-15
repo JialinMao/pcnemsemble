@@ -52,7 +52,7 @@ class PCNWalkMove(Proposal):
         # NOTE: probably should use replace=False. Probably that does not matter, not sure.
         idx = rand.choice(available_idx, [n, s]) if s is not None else None
 
-        if self.s is not None:
+        if s is not None:
             x = ensemble[idx] - np.mean(ensemble[idx], axis=1)[:, None, :]
             w = rand.normal(size=[n, 1, s])
             proposal = np.einsum("ijk, ikl -> ijl", w, x).squeeze()
