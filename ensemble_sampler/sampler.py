@@ -1,5 +1,4 @@
 import numpy as np
-import timeit
 
 from history import History
 
@@ -78,7 +77,7 @@ class Sampler(object):
                 ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
                               - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
 
-                accept = (np.log(self._random.uniform(size=kwargs.get('sample_size', 1))) < np.minimum(0, ln_acc_prob))
+                accept = (np.log(self._random.uniform(size=batch_size)) < np.minimum(0, ln_acc_prob))
 
                 acceptances[idx] = np.array(accept, dtype=int)[:, None]
                 lnprobs[idx] = ln_acc_prob[:, None]
