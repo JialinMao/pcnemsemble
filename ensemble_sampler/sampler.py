@@ -1,4 +1,5 @@
 import numpy as np
+from emcee.autocorr import *
 
 from history import History
 
@@ -92,6 +93,13 @@ class Sampler(object):
                 self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
 
         return self._history
+
+    def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
+        """
+        Adopted from emcee.ensemble. See emcee docs for detail. 
+        """
+        chain = self.t_dist.get_auto_corr_f(np.mean(self._history.get('chain'), axis=0))
+        return integrated_time(chain, axis=0, low=low, high=high, step=step, c=c, fast=fast)
 
     @property
     def history(self):

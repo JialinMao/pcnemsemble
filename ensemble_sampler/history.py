@@ -129,14 +129,6 @@ class History(object):
             df = DataFrame(np.vstack([chain[:, i[0]], chain[:, i[1]]]).T, columns=[x, y])
             sns.jointplot(x=x, y=y, data=df)
 
-    def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
-        """
-        Adopted from emcee.ensemble. See emcee docs for detail. 
-        """
-        return autocorr.integrated_time(np.mean(self.get("chain"), axis=0), axis=0,
-                                        low=low, high=high, step=step, c=c,
-                                        fast=fast)
-
     @property
     def acceptance_rate(self):
         return np.sum(self._history.get('accepted'), axis=1) / float(self._niter)

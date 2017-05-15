@@ -57,14 +57,13 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         acc_curr_iter = float(100*hist.acceptance_rate.mean())
         acc_r += acc_curr_iter
         try:
-            auto_corr = hist.auto_corr()
+            auto_corr = sampler.auto_corr()
         except AutocorrError, err:
             auto_corr = err
-        finally:
-            print 'auto-correlation time: %s' % auto_corr
+        print 'auto-correlation time: %s' % auto_corr
 
         if save_dir is not None and i % save_every == 0:
-            print 'writing to %s.pkl...' % title
+            print 'writing to %s.pkl...' % (title+'_'+str(i))
             with open(save_dir+title+'_'+str(i)+'.pkl', 'wb') as f:
                 cPickle.dump({'auto_corr': auto_corr,
                               'acceptance_rate': acc_curr_iter}, f)

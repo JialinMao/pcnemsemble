@@ -23,3 +23,6 @@ class SPDE(Distribution):
         """
         p_u_i = (x[:, 1:] - x[:, :-1])**2 * self._N / 2.0 - (1 - (x[:, 1:] + x[:, :-1])**2)**2 / (2.0 * self._N)
         return - np.sum(p_u_i, axis=1)
+
+    def get_auto_corr_f(self, chain):
+        return np.sum(chain[:, 1:] + chain[:, :-1], axis=1) / (2.0 * self._N)
