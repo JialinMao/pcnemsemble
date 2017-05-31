@@ -29,6 +29,41 @@ class Sampler(object):
         """
         self._history.reset()
 
+    def sample(self, niter, batch_size, **kwargs):
+        for i in range(niter):
+            acceptances = np.empty([self.nwalkers, 1])
+            lnprobs = np.empty([self.nwalkers, 1])
+            for j in range(int(np.ceil(self.nwalkers // batch_size))):
+                start = (j * batch_size) % self.nwalkers
+                idx = np.remainder(start + np.arange(batch_size), self.nwalkers)
+                all_walkers = self._history.curr_pos
+
+                curr_walker = all_walkers[idx]
+                curr_lnprob = self.t_dist.get_lnprob(curr_walker)
+                ensemble = all_walkers
+                ens_idx = np.delete(np.arange(self.nwalkers), idx)
+
+                proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
+
+                ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
+                              - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
+
+                accept = (np.log(self._random.uniform(size=batch_size)) < np.minimum(0, ln_acc_prob))
+
+                acceptances[idx] = np.array(accept, dtype=int)[:, None]
+                lnprobs[idx] = ln_acc_prob[:, None]
+
+                self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
+
+            if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
+                print '====iter %s====' % i
+                print 'accepted %d proposals' % np.sum(acceptances, dtype=int)
+
+            if kwargs.get('store', False) and i % kwargs.get('store_every', 1) == 0:
+                self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
+
+            # yield self._history.get('chain'), self.history.get('lnprob'), self.history.get('accepted')
+
     def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, **kwargs):
         """
         Iterate :func:`sample` for ``N`` iterations and return the result.
@@ -60,39 +95,13 @@ class Sampler(object):
             else:
                 self._history.curr_pos = p0
 
-        for i in range(niter):
-            acceptances = np.empty([self.nwalkers, 1])
-            lnprobs = np.empty([self.nwalkers, 1])
-            for j in range(int(np.ceil(self.nwalkers // batch_size))):
-                start = (j * batch_size) % self.nwalkers
-                idx = np.remainder(start + np.arange(batch_size), self.nwalkers)
-                all_walkers = self._history.curr_pos
-
-                curr_walker = all_walkers[idx]
-                curr_lnprob = self.t_dist.get_lnprob(curr_walker)
-                ensemble = all_walkers
-                ens_idx = np.delete(np.arange(self.nwalkers), idx)
-
-                proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
-
-                ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
-                              - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
-
-                accept = (np.log(self._random.uniform(size=batch_size)) < np.minimum(0, ln_acc_prob))
-
-                acceptances[idx] = np.array(accept, dtype=int)[:, None]
-                lnprobs[idx] = ln_acc_prob[:, None]
-
-                self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
-
-            if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
-                print '====iter %s====' % i
-                print 'accepted %d proposals' % np.sum(acceptances, dtype=int)
-
-            if kwargs.get('store', True) and i % kwargs.get('store_every', 1) == 0:
-                self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
-
-        return self._history
+        try:
+            self.sample(niter, batch_size, **kwargs)
+        except RuntimeWarning:
+            import ipdb
+            ipdb.set_trace()
+        # for h in self.sample(niter, batch_size, **kwargs):
+        #     pass
 
     def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
         """
