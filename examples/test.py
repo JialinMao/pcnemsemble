@@ -33,6 +33,8 @@ parser.add_argument('--title', type=str, default=None)
 parser.add_argument('--save-every', type=int, default=1)
 parser.add_argument('--save-dir', type=str, default=None)
 
+parser.add_argument('--store-every', type=int, default=1)
+parser.add_argument('--store', action='store_true')
 # for spde distribution
 args = parser.parse_args()
 
@@ -54,4 +56,5 @@ proposal = es.PCNWalkMove(s=args.s, beta=args.beta, scale=args.scale, symmetric=
 sampler = es.Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
 
 es.run(dim, sampler, batch_size, niters, n, pre, nwalkers,
-       args.title, args.verbose, args.print_every, args.plot, args.save_dir, args.save_every)
+       args.title, args.verbose, args.print_every, args.plot,
+       args.save_dir, args.save_every, args.store, args.store_every)

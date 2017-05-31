@@ -62,7 +62,7 @@ class Sampler(object):
             if kwargs.get('store', False) and i % kwargs.get('store_every', 1) == 0:
                 self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
 
-            # yield self._history.get('chain'), self.history.get('lnprob'), self.history.get('accepted')
+            yield self._history.get('chain'), self.history.get('lnprob'), self.history.get('accepted')
 
     def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, **kwargs):
         """
@@ -95,13 +95,8 @@ class Sampler(object):
             else:
                 self._history.curr_pos = p0
 
-        try:
-            self.sample(niter, batch_size, **kwargs)
-        except RuntimeWarning:
-            import ipdb
-            ipdb.set_trace()
-        # for h in self.sample(niter, batch_size, **kwargs):
-        #     pass
+        for h in self.sample(niter, batch_size, **kwargs):
+            pass
 
     def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
         """
