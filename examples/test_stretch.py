@@ -3,7 +3,7 @@ import numpy as np
 from ensemble_sampler import *
 
 dim = 2
-nwalkers = 5
+nwalkers = 4
 niters = 10000
 
 t_dist = Rosenbrock()

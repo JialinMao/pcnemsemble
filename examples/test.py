@@ -11,6 +11,7 @@ import numpy as np
 import ensemble_sampler as es
 
 SUPPORTED_DIST = ['spde', 'rosenbrock', 'gaussian']
+SUPPORTED_PROPOSAL = ['walk', 'stretch']
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--distribution', type=str)
@@ -22,6 +23,8 @@ parser.add_argument('--pre', type=int, default=0)
 parser.add_argument('--n', type=int, default=5)
 
 # for proposal
+parser.add_argument('--proposal', type=str, default='walk')
+parser.add_argument('--a', type=int, default=2.0)
 parser.add_argument('--s', type=int, default=None)
 parser.add_argument('--beta', type=float, default=None)
 parser.add_argument('--scale', type=float, default=None)
@@ -34,7 +37,7 @@ parser.add_argument('--title', type=str, default=None)
 parser.add_argument('--save-every', type=int, default=1)
 parser.add_argument('--save-dir', type=str, default=None)
 
-parser.add_argument('--store-every', type=int, default=1)
+parser.add_argument('--store-every', type=int, default=None)
 parser.add_argument('--store', action='store_true')
 # for spde distribution
 args = parser.parse_args()
@@ -54,7 +57,11 @@ elif args.distribution == 'rosenbrock':
 elif args.distribution == 'gaussian':
     t_dist = es.MultivariateGaussian(mu=np.random.randn(dim), cov=np.identity(dim))
 
-proposal = es.PCNWalkMove(s=args.s, beta=args.beta, scale=args.scale, symmetric=args.symmetric)
+assert args.proposal in SUPPORTED_PROPOSAL, 'Distribution %s not supported. Supported distributions are %s.' % (args.proposal, SUPPORTED_PROPOSAL)
+if args.proposal == 'walk':
+    proposal = es.PCNWalkMove(s=args.s, beta=args.beta, scale=args.scale, symmetric=args.symmetric)
+elif args.proposal == 'stretch':
+    proposal = es.StretchMove(a=args.a)
 sampler = es.Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
 
 es.run(dim, sampler, batch_size, niters, n, pre, nwalkers,
