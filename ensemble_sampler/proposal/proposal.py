@@ -8,7 +8,7 @@ class Proposal(object):
     def __init__(self, *args, **kwargs):
         pass
 
-    def propose(self, curr_walker, ensemble):
+    def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
         raise NotImplementedError("proposal method must be implemented"
                                   "by subclass")
 

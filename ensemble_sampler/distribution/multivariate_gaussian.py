@@ -21,7 +21,8 @@ class MultivariateGaussian(Distribution):
         :param dim (optional): 
             dimension of the gaussian, used to check the eligibility of input parameter
         """
-        assert len(mu) == dim, "input shape not match, %d != %d" % (mu.shape[0], dim)
+        if dim is not None:
+            assert len(mu) == dim, "input shape not match, %d != %d" % (mu.shape[0], dim)
         self._mu = mu
         self._icov = icov
         if icov is None:
@@ -33,3 +34,5 @@ class MultivariateGaussian(Distribution):
         diff = x - self._mu
         return -np.diag(np.dot(diff, np.dot(self._icov, diff.T))) / 2.0
 
+    def get_auto_corr_f(self, chain):
+        return chain
