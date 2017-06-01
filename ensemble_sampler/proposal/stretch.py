@@ -8,7 +8,7 @@ class StretchMove(Proposal):
 
     def __init__(self, a):
         """
-        Propose a stretch move .
+        Propose a stretch move.
         :param a:
             parameter that controls the proposal scale.
         """
@@ -25,11 +25,11 @@ class StretchMove(Proposal):
         m = ensemble.shape[0] if ens_idx is None else len(ens_idx)
 
         available_idx = ens_idx if ens_idx is not None else np.arange(m)
-        c_walkers = ensemble[rand.choice(available_idx, [n, 1])]
+        c_walkers = ensemble[rand.choice(available_idx, n)]
 
-        z = ((self.a - 1.0) * rand.uniform() + 1.0) ** 2 / self.a
+        self.z = ((self.a - 1.0) * rand.uniform(size=[n, 1]) + 1.0) ** 2 / self.a
 
-        new_pos = c_walkers + np.dot(z, walkers_to_move - c_walkers)
+        new_pos = c_walkers + self.z * (walkers_to_move - c_walkers)
 
         return new_pos
 
@@ -39,7 +39,7 @@ class StretchMove(Proposal):
         """
         assert self.z is not None
         if self.counter == 0:
-            prob = (self.dim - 1.0) * np.log(self.z)
+            prob = (self.dim - 1.0) * np.log(self.z.squeeze())
         else:
             prob = 0.0
         self.counter = (self.counter + 1) % 2
