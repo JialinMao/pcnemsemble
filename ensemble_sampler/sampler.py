@@ -66,13 +66,13 @@ class Sampler(object):
                 print 'accepted %d proposals' % np.sum(acceptances, dtype=int)
 
             if store:
-                self._history.update(itr=i % store_every, accepted=acceptances,
-                                     lnprob=lnprobs, chain=self._history.curr_pos)
+                itr = i if store_every is None else i % store_every
+                self._history.update(itr=itr, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
                 if store_every is not None and i % store_every == 0:
                     self._history.save_to(save_dir, title)
                     self._history.clear()
-
-            yield self._history.get('chain'), self.history.get('lnprob'), self.history.get('accepted')
+            else:
+                yield self._history.curr_pos, lnprobs, acceptances
 
     def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, verbose=False, print_every=200,
                  store=False, store_every=None, save_dir=None, title='', **kwargs):
@@ -107,7 +107,7 @@ class Sampler(object):
         if rstate0 is not None:
             self._random.set_state(rstate0)
         self._history.niter = niter
-        self._history.save_every = store_every
+        self._history.save_every = niter if store_every is None else store_every
 
         if self._history.curr_pos is None:
             if p0 is None:
