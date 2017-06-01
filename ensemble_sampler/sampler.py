@@ -32,23 +32,30 @@ class Sampler(object):
         for i in xrange(niter):
             acceptances = np.empty([self.nwalkers, 1])
             lnprobs = np.empty([self.nwalkers, 1])
+            curr_lnprob = None
             for j in xrange(int(np.ceil(self.nwalkers // batch_size))):
                 start = (j * batch_size) % self.nwalkers
                 idx = np.remainder(start + np.arange(batch_size), self.nwalkers)
                 all_walkers = self._history.curr_pos
 
                 curr_walker = all_walkers[idx]
-                curr_lnprob = self.t_dist.get_lnprob(curr_walker)
-                ensemble = all_walkers
-                ens_idx = np.delete(np.arange(self.nwalkers), idx)
+                ens_idx = np.arange(self.nwalkers)
+                ens_idx[idx] = -1
+                ensemble = all_walkers[ens_idx >= 0]
+                if curr_lnprob is None:
+                    curr_lnprob = self.t_dist.get_lnprob(curr_walker)
 
-                proposal = self.proposal.propose(curr_walker, ensemble, ens_idx=ens_idx, random=self._random, **kwargs)
+                proposal = self.proposal.propose(curr_walker, ensemble, random=self._random, **kwargs)
 
-                ln_acc_prob = self.t_dist.get_lnprob(proposal) + self.proposal.ln_transition_prob(proposal, curr_walker) \
-                              - (curr_lnprob + self.proposal.ln_transition_prob(curr_walker, proposal))
+                proposal_lnprob = self.t_dist.get_lnprob(proposal)
+                ln_transition_prob_1 = self.proposal.ln_transition_prob(proposal, curr_walker)
+                ln_transition_prob_2 = self.proposal.ln_transition_prob(curr_walker, proposal)
+
+                ln_acc_prob = (proposal_lnprob + ln_transition_prob_1) - (curr_lnprob + ln_transition_prob_2)
 
                 accept = (np.log(self._random.uniform(size=batch_size)) < np.minimum(0, ln_acc_prob))
 
+                curr_lnprob[accept] = proposal_lnprob[accept]
                 acceptances[idx] = np.array(accept, dtype=int)[:, None]
                 lnprobs[idx] = ln_acc_prob[:, None]
 
