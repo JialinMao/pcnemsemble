@@ -38,6 +38,7 @@ class History(object):
         self._recording_idx = 0
         self._history = None
         self._curr_pos = None
+        self._save_fname = ''
 
         self.reset()
 
@@ -49,6 +50,7 @@ class History(object):
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
         self._recording_idx = 0
         self._curr_pos = None
+        self._save_fname = ''
 
     def clear(self):
         """
@@ -78,35 +80,48 @@ class History(object):
         """
         Make sure the file 'save_dir' + 'title' .hdf5 does not exist at the beginning of this run. 
         """
-
-        f_name = save_dir + title + '.hdf5'
-        print 'saving to ' + f_name + '...'
-        if os.path.isfile(f_name):
-            f = h5py.File(f_name, 'r+')
+        self._save_fname = save_dir + title + '.hdf5'
+        print 'saving to ' + self._save_fname + '...'
+        if os.path.isfile(self._save_fname):
+            f = h5py.File(self._save_fname, 'r+')
             for name in self._name_to_dim.keys():
                 dset = f[name]
                 dset.resize(dset.shape[1] + self._save_every, axis=1)
-                dset[:, -self._save_every:, :] = self.get(name)
+                dset[:, -self._save_every:, :] = self._history.get(name)
         else:
-            f = h5py.File(f_name, 'w')
+            f = h5py.File(self._save_fname, 'w')
             for name in self._name_to_dim.keys():
                 dset = f.create_dataset(name, (self._nwalkers, self._save_every, self._name_to_dim[name]), dtype='f',
                                         maxshape=(self._nwalkers, self._niter, self._name_to_dim[name]), chunks=True)
-                dset[...] = self.get(name)
+                dset[...] = self._history.get(name)
         f.close()
 
-    def get(self, name=None):
+    def get(self, name=None, get_every=1, hdf5=False):
         """
         Get `name` from history, return all if name is None. 
+        if hdf5 is True, return h5py dataset
         """
-        if not isinstance(name, list):
-            return self._history.get(name)
-        idx = self._history.keys() if name is None else name
-        try:
-            return dict([(i, self._history[i]) for i in idx])
-        except KeyError, err:
-            print err
-            print 'Supported keys: %s' % str(self._history.keys())
+        if os.path.isfile(self._save_fname):
+            f = h5py.File(self._save_fname, 'r')
+            if not isinstance(name, list):
+                dset = f[name] if hdf5 else f[name][::get_every]
+            else:
+                idx = self._history.keys() if name is None else name
+                try:
+                    dset = dict([(i, f[i]) for i in idx]) if hdf5 else dict([(i, f[i][::get_every]) for i in idx])
+                except KeyError, err:
+                    print err
+                    print 'Supported keys: %s' % str(self._history.keys())
+            return dset
+        else:
+            if not isinstance(name, list):
+                return self._history.get(name)
+            idx = self._history.keys() if name is None else name
+            try:
+                return dict([(i, self._history[i]) for i in idx])
+            except KeyError, err:
+                print err
+                print 'Supported keys: %s' % str(self._history.keys())
 
     def get_flat(self, name=None):
         """
@@ -119,19 +134,6 @@ class History(object):
         idx = self._history.keys() if name is None else name
         try:
             return dict([(i, self._history.get(i).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
-        except KeyError, err:
-            print err
-            print 'Supported keys: %s' % str(self._history.keys())
-
-    def get_every(self, get_every, name=None):
-        """
-        Return (flattened) history taken every `get_every` steps. 
-        """
-        if not isinstance(name, list):
-            return self.get_flat(name)[::get_every]
-        idx = self._history.keys() if name is None else name
-        try:
-            return dict([(i, self.get_flat(name)[i][:, ::get_every]) for i in idx])
         except KeyError, err:
             print err
             print 'Supported keys: %s' % str(self._history.keys())
