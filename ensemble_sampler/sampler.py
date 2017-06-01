@@ -20,20 +20,19 @@ class Sampler(object):
         self.t_dist = t_dist
         self.proposal = proposal
         self._history = History(dim=dim, nwalkers=nwalkers)
-
         self._random = np.random.RandomState()
 
     def reset(self):
-        """
-        Clear chain. 
-        """
         self._history.reset()
 
-    def sample(self, niter, batch_size, **kwargs):
-        for i in range(niter):
+    def clear(self):
+        self._history.clear()
+
+    def _sample(self, niter, batch_size, verbose, print_every, store, store_every, save_dir, title, **kwargs):
+        for i in xrange(niter):
             acceptances = np.empty([self.nwalkers, 1])
             lnprobs = np.empty([self.nwalkers, 1])
-            for j in range(int(np.ceil(self.nwalkers // batch_size))):
+            for j in xrange(int(np.ceil(self.nwalkers // batch_size))):
                 start = (j * batch_size) % self.nwalkers
                 idx = np.remainder(start + np.arange(batch_size), self.nwalkers)
                 all_walkers = self._history.curr_pos
@@ -55,16 +54,21 @@ class Sampler(object):
 
                 self._history.move(walker_idx=idx[accept], new_pos=proposal[accept])
 
-            if kwargs.get('verbose', False) and i % kwargs.get('print_every', 200) == 0:
+            if verbose and i % print_every == 0:
                 print '====iter %s====' % i
                 print 'accepted %d proposals' % np.sum(acceptances, dtype=int)
 
-            if kwargs.get('store', False) and i % kwargs.get('store_every', 1) == 0:
-                self._history.update(itr=i, accepted=acceptances, lnprob=lnprobs, chain=self._history.curr_pos)
+            if store:
+                self._history.update(itr=i % store_every, accepted=acceptances,
+                                     lnprob=lnprobs, chain=self._history.curr_pos)
+                if store_every is not None and i % store_every == 0:
+                    self._history.save_to(save_dir, title)
+                    self._history.clear()
 
             yield self._history.get('chain'), self.history.get('lnprob'), self.history.get('accepted')
 
-    def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, **kwargs):
+    def run_mcmc(self, niter, batch_size=1, p0=None, rstate0=None, verbose=False, print_every=200,
+                 store=False, store_every=None, save_dir=None, title='', **kwargs):
         """
         Iterate :func:`sample` for ``N`` iterations and return the result.
 
@@ -73,29 +77,38 @@ class Sampler(object):
         :param batch_size:
             In each iteration move `batch_size` walkers simultaneously using all other walkers as ensemble.
         :param p0:
-            The initial position vector.  Can also be None to resume from
-            where :func:``run_mcmc`` left off the last time it executed.
+            The initial position vector.  Can also be None to resume from where :func:``run_mcmc`` left off 
+            the last time it executed.
         :param rstate0:
             The initial random state. Use default if None.
+        :param verbose:
+            Print information to keep track of sampling process. 
+        :param print_every:
+            How often to print.
+        :param store:
+            Store chain if True, otherwise discard chain.
+        :param store_every:
+            How often to save chain to file and free-up memory. If None, store the entire chain
+        :param save_dir:
+            The directory to save history. 
+        :param title:
+            Title of the saved file.
         :param kwargs:
-            Optional keywords arguments.
-             verbose: print every _print_every_ iteration. For debugging purpose.
-             store: store to history every _store_every_ iterations.
+            Optional keywords arguments for proposal / calculating lnprob.
         """
         assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
         if rstate0 is not None:
             self._random.set_state(rstate0)
         self._history.niter = niter
-        self._history.reset()
+        self._history.save_every = store_every
 
         if self._history.curr_pos is None:
             if p0 is None:
-                raise ValueError("Cannot have p0=None if run_mcmc has never "
-                                 "been called.")
+                raise ValueError("Cannot have p0=None if run_mcmc has never been called.")
             else:
                 self._history.curr_pos = p0
 
-        for h in self.sample(niter, batch_size, **kwargs):
+        for h in self._sample(niter, batch_size, verbose, print_every, store, store_every, save_dir, title, **kwargs):
             pass
 
     def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):

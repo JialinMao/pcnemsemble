@@ -44,7 +44,7 @@ def plot_trajectory(dim, history, start_from=0):
 
 def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         title='', verbose=False, print_every=200, plot=False, save_dir=None,
-        save_every=1, store=False, store_every=1):
+        store=False, store_every=1):
     acc_r = 0.0
     for i in range(n):
         sampler.reset()
@@ -53,22 +53,17 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
             s = es.Sampler(dim=dim, t_dist=sampler.t_dist, proposal=es.PCNWalkMove(s=None, scale=0.2), nwalkers=nwalkers)
             p0 = s.run_mcmc(pre, batch_size=batch_size, p0=p0, verbose=False).curr_pos
         start = timeit.default_timer()
-        hist = sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0, verbose=verbose, print_every=print_every,
-                                store=store, store_every=store_every)
+        sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0, verbose=verbose, print_every=print_every,
+                         store=store, store_every=store_every, save_dir=save_dir, title=title)
+        hist = sampler.history
         print 'finishes loop %d in %.2f seconds' % (i, float(timeit.default_timer() - start))
-        acc_curr_iter = float(100*sampler.history.acceptance_rate.mean())
+        acc_curr_iter = float(100*hist.acceptance_rate.mean())
         acc_r += acc_curr_iter
         try:
             auto_corr = sampler.auto_corr()
         except AutocorrError, err:
             auto_corr = err
         print 'auto-correlation time: %s' % auto_corr
-
-        if save_dir is not None and i % save_every == 0:
-            print 'writing to %s.pkl...' % (title+'_'+str(i))
-            with open(save_dir+title+'_'+str(i)+'.pkl', 'wb') as f:
-                cPickle.dump({'auto_corr': auto_corr,
-                              'acceptance_rate': acc_curr_iter}, f)
 
     print 'avg_acc_r: %.2f%s' % (float(acc_r) / float(n), '%')
 

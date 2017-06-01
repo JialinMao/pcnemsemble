@@ -1,19 +1,21 @@
 from __future__ import division
 
-from utils import *
 import numpy as np
-from emcee import autocorr
+import h5py
+import os.path
 
 # NOTE: For plotting with seaborn. Can be commented out if do not have package installed.
 import seaborn as sns
 from pandas import DataFrame
+
+from utils import *
 
 
 class History(object):
     """
     History object, stores history of samples, lnprobs, accepted & extra_data
     """
-    def __init__(self, dim=1, nwalkers=1, niter=1, extra={}):
+    def __init__(self, dim=1, nwalkers=1, niter=1, save_every=1, extra={}):
         """
         Initiate a chain object. 
         Records sample history, lnprob history, acceptance history and extra information 
@@ -22,11 +24,13 @@ class History(object):
         :param dim: dimension of the sample space
         :param nwalkers: number of walkers
         :param niter: number of iterations 
+        :param save_every: max len of stored history
         :param extra: Dictionary {'blah': dim(blah)} of extra information to store.
         """
         self._dim = dim
         self._nwalkers = nwalkers
         self._niter = niter
+        self._save_every = save_every
 
         self._name_to_dim = {'chain': dim, 'lnprob': 1, 'accepted': 1}
         self._name_to_dim.update(extra)
@@ -41,10 +45,55 @@ class History(object):
         """
         Reset history and current position to empty. 
         """
-        self._history = {k: np.zeros([self._nwalkers, self._niter, v])
+        self._history = {k: np.zeros([self._nwalkers, self._save_every, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
         self._recording_idx = 0
         self._curr_pos = None
+
+    def clear(self):
+        """
+        Clear history for future storage.
+        """
+        for k in self._history.keys():
+            self._history[k] *= 0.0
+        self._recording_idx = 0
+
+    def update(self, walker_idx=slice(None), itr=None, **kwargs):
+        """
+        Updating the information of _walker_idx_th walker.
+        Info is passed in through kwargs in the form name=data
+        """
+        i = itr
+        if i is None:
+            i = self._recording_idx
+            self._recording_idx += 1
+        for k in self._history.keys():
+            if kwargs.get(k) is not None:
+                self._history[k][walker_idx, i, :] = kwargs.get(k)
+
+    def move(self, new_pos, walker_idx=slice(None)):
+        self._curr_pos[walker_idx] = new_pos
+
+    def save_to(self, save_dir, title):
+        """
+        Make sure the file 'save_dir' + 'title' .hdf5 does not exist at the beginning of this run. 
+        """
+
+        f_name = save_dir + title + '.hdf5'
+        print 'saving to ' + f_name + '...'
+        if os.path.isfile(f_name):
+            f = h5py.File(f_name, 'r+')
+            for name in self._name_to_dim.keys():
+                dset = f[name]
+                dset.resize(dset.shape[1] + self._save_every, axis=1)
+                dset[:, -self._save_every:, :] = self.get(name)
+        else:
+            f = h5py.File(f_name, 'w')
+            for name in self._name_to_dim.keys():
+                dset = f.create_dataset(name, (self._nwalkers, self._save_every, self._name_to_dim[name]), dtype='f',
+                                        maxshape=(self._nwalkers, self._niter, self._name_to_dim[name]), chunks=True)
+                dset[...] = self.get(name)
+        f.close()
 
     def get(self, name=None):
         """
@@ -87,22 +136,6 @@ class History(object):
             print err
             print 'Supported keys: %s' % str(self._history.keys())
 
-    def update(self, walker_idx=slice(None), itr=None, **kwargs):
-        """
-        Updating the information of _walker_idx_th walker.
-        Info is passed in through kwargs in the form name=data
-        """
-        i = itr
-        if i is None:
-            i = self._recording_idx
-            self._recording_idx += 1
-        for k in self._history.keys():
-            if kwargs.get(k) is not None:
-                self._history[k][walker_idx, i, :] = kwargs.get(k)
-
-    def move(self, new_pos, walker_idx=slice(None)):
-        self._curr_pos[walker_idx] = new_pos
-
     def plot_trajectory(self, walker_id, dim, start_from=0):
         """
         Plot the trajectory of selected walker in the selected dimension(s).
@@ -118,7 +151,7 @@ class History(object):
         """
         plot_hist(dim, self.get_flat('chain').T, start_from=start_from)
 
-    def plot_scatter(self, dim):
+    def plot_scatter(self, dim, kind='kde'):
         """
         Scattered plot for two chosen dimensions. Not sure whether this makes sense...
         dim should be list of pairs of integers [[a_1, b_1], [a_2, b_2], ...]
@@ -127,7 +160,7 @@ class History(object):
             x, y = ['dim_%s' % int(i[k]+1) for k in range(2)]
             chain = self.get_flat('chain')
             df = DataFrame(np.vstack([chain[:, i[0]], chain[:, i[1]]]).T, columns=[x, y])
-            sns.jointplot(x=x, y=y, data=df)
+            sns.jointplot(x=x, y=y, data=df, kind=kind)
 
     @property
     def acceptance_rate(self):
@@ -147,16 +180,19 @@ class History(object):
 
     @property
     def niter(self):
-        """
-        The length of history. Typically should be number_of_iterations // record_every. 
-        """
         return self._niter
 
     @niter.setter
     def niter(self, N):
-        """
-        Set the number of iterations, will trigger reset (including the current position).
-        """
         self._niter = N
+        self.reset()
+
+    @property
+    def save_every(self):
+        return self._save_every
+
+    @save_every.setter
+    def save_every(self, N):
+        self._save_every = N
         self.reset()
 
