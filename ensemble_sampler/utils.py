@@ -47,7 +47,7 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         store=False, store_every=1):
     acc_r = 0.0
     for i in range(n):
-        sampler.reset()
+        sampler.init()
         p0 = np.random.randn(dim*nwalkers).reshape([nwalkers, dim])
         if pre > 0:
             s = es.Sampler(dim=dim, t_dist=sampler.t_dist, proposal=es.PCNWalkMove(s=None, scale=0.2), nwalkers=nwalkers)
@@ -55,9 +55,8 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         start = timeit.default_timer()
         sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0, verbose=verbose, print_every=print_every,
                          store=store, store_every=store_every, save_dir=save_dir, title=title)
-        hist = sampler.history
         print 'finishes loop %d in %.2f seconds' % (i, float(timeit.default_timer() - start))
-        acc_curr_iter = float(100*hist.acceptance_rate.mean())
+        acc_curr_iter = float(100*np.mean((sampler.acceptance / niters)))
         acc_r += acc_curr_iter
         try:
             auto_corr = sampler.auto_corr()

@@ -17,7 +17,7 @@ class History(object):
     """
     def __init__(self, dim=1, nwalkers=1, niter=1, save_every=1, extra={}):
         """
-        Initiate a chain object. 
+        Initiate a `history` object. 
         Records sample history, lnprob history, acceptance history and extra information 
         for niter iterations. Dim, nwalkers, niter, sample_every can be set later.
         
@@ -32,23 +32,21 @@ class History(object):
         self._niter = niter
         self._save_every = save_every
 
-        self._name_to_dim = {'chain': dim, 'lnprob': 1, 'accepted': 1}
+        self._name_to_dim = {'chain': dim}
         self._name_to_dim.update(extra)
 
-        self._recording_idx = 0
         self._history = None
         self._curr_pos = None
         self._save_fname = ''
 
-        self.reset()
+        self.init()
 
-    def reset(self):
+    def init(self):
         """
         Reset history and current position to empty. 
         """
         self._history = {k: np.zeros([self._nwalkers, self._save_every, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
-        self._recording_idx = 0
         self._curr_pos = None
         self._save_fname = ''
 
@@ -58,20 +56,15 @@ class History(object):
         """
         for k in self._history.keys():
             self._history[k] *= 0.0
-        self._recording_idx = 0
 
-    def update(self, walker_idx=slice(None), itr=None, **kwargs):
+    def update(self, itr, walker_idx=slice(None), **kwargs):
         """
         Updating the information of _walker_idx_th walker.
         Info is passed in through kwargs in the form name=data
         """
-        i = itr
-        if i is None:
-            i = self._recording_idx
-            self._recording_idx += 1
         for k in self._history.keys():
             if kwargs.get(k) is not None:
-                self._history[k][walker_idx, i, :] = kwargs.get(k)
+                self._history[k][walker_idx, itr, :] = kwargs.get(k)
 
     def move(self, new_pos, walker_idx=slice(None)):
         self._curr_pos[walker_idx] = new_pos
@@ -80,7 +73,7 @@ class History(object):
         """
         Make sure the file 'save_dir' + 'title' .hdf5 does not exist at the beginning of this run. 
         """
-        self._save_fname = save_dir + title + '.hdf5'
+        self._save_fname = os.path.join(save_dir, title+'.hdf5')
         print 'saving to ' + self._save_fname + '...'
         if os.path.isfile(self._save_fname):
             f = h5py.File(self._save_fname, 'r+')
@@ -187,7 +180,7 @@ class History(object):
     @niter.setter
     def niter(self, N):
         self._niter = N
-        self.reset()
+        self.init()
 
     @property
     def save_every(self):
@@ -196,5 +189,5 @@ class History(object):
     @save_every.setter
     def save_every(self, N):
         self._save_every = N
-        self.reset()
+        self.init()
 
