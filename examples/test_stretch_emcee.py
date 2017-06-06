@@ -2,8 +2,9 @@ import sys; sys.path.insert(0, "/Users/M/emcee")
 import emcee
 import numpy as np
 
-nwalkers = 4
+nwalkers = 250
 dim = 2
+N = 10000
 
 
 class Rosenbrock(object):
@@ -15,5 +16,5 @@ class Rosenbrock(object):
         return -(self.a1 * (p[1] - p[0] ** 2) ** 2 + (1 - p[0]) ** 2) / self.a2
 
 p0 = np.random.rand(nwalkers * dim).reshape(nwalkers, dim)
-sampler = emcee.EnsembleSampler(4, 2, Rosenbrock())
-hist = sampler.run_mcmc(p0, N=10000)
+sampler = emcee.EnsembleSampler(nwalkers, dim, Rosenbrock())
+hist = sampler.run_mcmc(p0, N=N)

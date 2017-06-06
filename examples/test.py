@@ -16,7 +16,7 @@ SUPPORTED_PROPOSAL = ['walk', 'stretch']
 parser = argparse.ArgumentParser()
 parser.add_argument('--distribution', type=str)
 parser.add_argument('--dim', type=int, default=2)
-parser.add_argument('--batch-size', type=int, default=50)
+parser.add_argument('--batch-size', type=int, default=None)
 parser.add_argument('--nwalkers', type=int, default=100)
 parser.add_argument('--niters', type=int, default=10000)
 parser.add_argument('--pre', type=int, default=0)
