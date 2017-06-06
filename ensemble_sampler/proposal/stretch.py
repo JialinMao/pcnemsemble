@@ -18,13 +18,12 @@ class StretchMove(Proposal):
         self.counter = 0
         super(Proposal, self).__init__()
 
-    def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
+    def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
         rand = np.random.RandomState() if random is None else random
-
         n, self.dim = walkers_to_move.shape
-        m = ensemble.shape[0] if ens_idx is None else len(ens_idx)
+        m = ensemble.shape[0]
 
-        available_idx = ens_idx if ens_idx is not None else np.arange(m)
+        available_idx = np.arange(m)
         c_walkers = ensemble[rand.choice(available_idx, n)]
 
         self.z = ((self.a - 1.0) * rand.uniform(size=[n, 1]) + 1.0) ** 2 / self.a

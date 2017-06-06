@@ -23,49 +23,57 @@ class PCNWalkMove(Proposal):
         self.symmetric = symmetric
         super(Proposal, self).__init__()
 
-    def propose(self, walkers_to_move, ensemble, ens_idx=None, random=None, *args, **kwargs):
+    def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
         """
         :param walkers_to_move: 
-            position of the walker(s) to move, array of shape (n, dim)
+            position of the walker(s) to move, shape = (batch_size, dim)
         :param ensemble: 
             ensemble from which we can calculate the covariance matrix for proposal.
-            If ens_idx is None, ensemble should be array of shape (m, dim), where each row is an available walker.
-            Otherwise ensemble should be array of shape (n + m, dim), with all walkers in the ensemble.
-        :param ens_idx:
-            Index of available walkers in the ensemble. See above for details.
+            Should be array of shape (Nc=number of complement walkers, dim), where each row is an available walker.
         :param random:
             random number generator. Use default if None.
     
         :return: proposed move of shape (Nc, dim)
         """
+        if kwargs.get('debug', False):
+            import ipdb
+            ipdb.set_trace()
         rand = np.random.RandomState() if random is None else random
         scale = kwargs.get('scale', self.scale)
         beta = kwargs.get('beta', self.beta)
         s = kwargs.get('s', self.s)
 
-        n, dim = walkers_to_move.shape
-        m = ensemble.shape[0] if ens_idx is None else len(ens_idx)
+        batch_size, dim = walkers_to_move.shape
+        Nc, _ = ensemble.shape
 
-        assert s <= m, "Not enough walkers to use %d ensembles" % s
+        assert s <= Nc, "%d walkers in ensemble, not enough for %d ensembles" % (Nc, s)
 
-        available_idx = ens_idx if ens_idx is not None else np.arange(m)
+        available_idx = np.arange(Nc)
+
         # NOTE: probably should use replace=False. Probably that does not matter, not sure.
-        idx = rand.choice(available_idx, [n, s]) if s is not None else None
-
         if s is not None:
+            idx = rand.choice(available_idx, [batch_size, s], replace=False)
             x = ensemble[idx] - np.mean(ensemble[idx], axis=1)[:, None, :]
-            w = rand.normal(size=[n, 1, s])
+            w = rand.normal(size=[batch_size, 1, s])
             proposal = np.einsum("ijk, ikl -> ijl", w, x).squeeze()
         else:
-            proposal = rand.normal(size=[n, dim])
+            proposal = rand.normal(size=[batch_size, dim])
+
         if beta is not None:
             new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
+            # new_pos = walkers_to_move + beta * proposal
         else:
             new_pos = walkers_to_move + scale * proposal
 
         return new_pos
 
     def ln_transition_prob(self, x, y):
+        """
+        Calculate ln transition probability from x -> y
+        :param x: start position, shape=(batch_size, dim) 
+        :param y: end position, shape=(batch_size, dim) 
+        :return: prob, shape=(batch_size, 1) 
+        """
         if self.beta is None or self.symmetric:
             return 0.0
         diff = y - np.sqrt(1 - self.beta ** 2) * x
