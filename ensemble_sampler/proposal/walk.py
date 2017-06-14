@@ -52,18 +52,22 @@ class PCNWalkMove(Proposal):
 
         # NOTE: probably should use replace=False. Probably that does not matter, not sure.
         if s is not None:
-            idx = rand.choice(available_idx, [batch_size, s])
+            s = Nc
+            # idx = rand.choice(available_idx, [batch_size, s])
+            idx = np.tile(np.arange(Nc), [batch_size, 1])
             x = ensemble[idx] - np.mean(ensemble[idx], axis=1)[:, None, :]
+            # x = ensemble - np.mean(ensemble, axis=1)[:, None, :]
             w = rand.normal(size=[batch_size, 1, s])
             proposal = np.einsum("ijk, ikl -> ijl", w, x).squeeze()
         else:
             proposal = rand.normal(size=[batch_size, dim])
 
+        sample_mean = np.mean(ensemble, axis=0)
         if beta is not None:
-            new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
+            new_pos = np.sqrt(1 - beta ** 2) * sample_mean + beta * proposal
             # new_pos = walkers_to_move + beta * proposal
         else:
-            new_pos = walkers_to_move + scale * proposal
+            new_pos = sample_mean + scale * proposal
 
         return new_pos
 
