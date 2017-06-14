@@ -39,16 +39,8 @@ class History(object):
         self._curr_pos = None
         self._save_fname = ''
 
-        self.init()
-
-    def init(self):
-        """
-        Reset history and current position to empty. 
-        """
         self._history = {k: np.zeros([self._nwalkers, self._save_every, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
-        self._curr_pos = None
-        self._save_fname = ''
 
     def clear(self):
         """
@@ -174,13 +166,22 @@ class History(object):
         self._curr_pos = p
 
     @property
+    def save_fname(self):
+        return self._save_fname
+
+    @save_fname.setter
+    def save_fname(self, name):
+        self._save_fname = name
+
+    @property
     def niter(self):
         return self._niter
 
     @niter.setter
     def niter(self, N):
         self._niter = N
-        self.init()
+        self._history = {k: np.zeros([self._nwalkers, self._save_every, v])
+                         for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
 
     @property
     def save_every(self):
@@ -189,5 +190,6 @@ class History(object):
     @save_every.setter
     def save_every(self, N):
         self._save_every = N
-        self.init()
+        self._history = {k: np.zeros([self._nwalkers, self._save_every, v])
+                         for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
 
