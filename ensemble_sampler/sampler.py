@@ -143,8 +143,11 @@ class Sampler(object):
         self._history.save_every = niter if store_every is None else store_every
 
         if self._history.curr_pos is None:
+            if kwargs.get('random_start'):
+                p0 = np.random.randn(self.nwalkers * self.dim).reshape([self.nwalkers, -1])
             if p0 is None:
-                raise ValueError("Cannot have p0=None if run_mcmc has never been called.")
+                raise ValueError("Cannot have p0=None if run_mcmc has never been called. "
+                                 "Set `random_start=True` in kwargs to use random start")
             else:
                 self._history.curr_pos = p0
 
