@@ -3,6 +3,7 @@ import numpy as np
 from emcee.autocorr import *
 
 from history import History
+from visualizer import Visualizer
 
 __all__ = ["Sampler"]
 
