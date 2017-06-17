@@ -12,8 +12,6 @@ parser.add_argument('--beta', type=float, default=0.4)
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--print-every', type=int, default=1000)
 
-parser.add_argument('--debug', action='store_true')
-
 args = parser.parse_args()
 
 print args
@@ -38,7 +36,7 @@ print 'cov: ', cov
 
 t_dist = MultivariateGaussian(cov=cov, mu=mu, dim=dim)
 
-proposal = PCNWalkMove(s=s, beta=beta)
-sampler = Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers, debug=args.debug)
+proposal = WalkMove(s=s, beta=beta)
+sampler = Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
 sampler.run_mcmc(niters, batch_size=1, p0=np.random.randn(dim*nwalkers).reshape([nwalkers, dim]),
                  verbose=args.verbose, print_every=args.print_every)

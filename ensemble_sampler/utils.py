@@ -3,7 +3,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import timeit
 from emcee.autocorr import *
-import cPickle
 
 import ensemble_sampler as es
 
@@ -50,7 +49,7 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         sampler.init()
         p0 = np.random.randn(dim*nwalkers).reshape([nwalkers, dim])
         if pre > 0:
-            s = es.Sampler(dim=dim, t_dist=sampler.t_dist, proposal=es.PCNWalkMove(s=None, scale=0.2), nwalkers=nwalkers)
+            s = es.Sampler(dim=dim, t_dist=sampler.t_dist, proposal=es.WalkMove(s=None, scale=0.2), nwalkers=nwalkers)
             p0 = s.run_mcmc(pre, batch_size=batch_size, p0=p0, verbose=False).curr_pos
         start = timeit.default_timer()
         sampler.run_mcmc(niters-pre, batch_size=batch_size, p0=p0, verbose=verbose, print_every=print_every,
@@ -71,5 +70,7 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         sns.plt.title(title)
         fig = img.get_fig()
         fig.savefig(title)
+
+
 
 

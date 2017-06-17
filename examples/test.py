@@ -59,7 +59,7 @@ elif args.distribution == 'gaussian':
 
 assert args.proposal in SUPPORTED_PROPOSAL, 'Distribution %s not supported. Supported distributions are %s.' % (args.proposal, SUPPORTED_PROPOSAL)
 if args.proposal == 'walk':
-    proposal = es.PCNWalkMove(s=args.s, beta=args.beta, scale=args.scale, symmetric=args.symmetric)
+    proposal = es.WalkMove(s=args.s, beta=args.beta, scale=args.scale)
 elif args.proposal == 'stretch':
     proposal = es.StretchMove(a=args.a)
 sampler = es.Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)

@@ -1,5 +1,5 @@
 from proposal import Proposal
-from walk import PCNWalkMove
+from walk import WalkMove
 from stretch import StretchMove
 
-__all__ = ['Proposal', 'PCNWalkMove', 'StretchMove']
+__all__ = ['Proposal', 'WalkMove', 'StretchMove']

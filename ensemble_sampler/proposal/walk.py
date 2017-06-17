@@ -1,26 +1,29 @@
 import numpy as np
 from proposal import Proposal
 
-__all__ = ['PCNWalkMove']
+__all__ = ['WalkMove']
 
 
-class PCNWalkMove(Proposal):
+class WalkMove(Proposal):
 
-    def __init__(self, s=None, beta=None, scale=1.0, symmetric=True):
+    def __init__(self, ensemble=False, s=None, beta=None, scale=1.0):
         """
-        Propose generalized ensemble walk move.
-        Use covariance matrix calculated from ensemble if `s` is not None, otherwise use identity matrix.
-        Use the strategy X(t+1) = sqrt(1 - beta ** 2) X(t) + beta * N(0, Cov) if `beta` is not None,
-        otherwise use simple random walk proposal with scale `scale`.
+        Generate a Gaussian r.v. W ~ N(0, C), 
+         where C = cov(s (all if s is None) walkers from ensemble)        , if ensemble = True
+         and   C = identity                                               , otherwise.
+        Make a proposal using the strategy:
+         X_{t+1} = X_t + scale * W_t                                      , if beta is None
+         X_{t+1} = mu + sqrt(1 - beta ** 2) (X_t - mu) + beta * W_t
+          where mu = sample mean                                          , otherwise. 
         """
-        if s is not None:
-            assert s >= 2, "Walk move must use an ensemble size larger than 2"
-            if beta is not None:
-                assert 0.0 <= beta <= 1.0, "beta must be in [0, 1]"
+        if ensemble and s is not None:
+            assert s >= 2, "ensemble size %d too small, must be >= 2" % s
+        if beta is not None:
+            assert 0 <= beta <= 1, "beta must be in [0, 1]"
         self.s = s
+        self.ensemble = ensemble
         self.beta = beta
         self.scale = scale
-        self.symmetric = symmetric
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
@@ -29,16 +32,14 @@ class PCNWalkMove(Proposal):
             position of the walker(s) to move, shape = (batch_size, dim)
         :param ensemble: 
             ensemble from which we can calculate the covariance matrix for proposal.
-            Should be array of shape (Nc=number of complement walkers, dim), where each row is an available walker.
+            Should be array of shape (Nc, dim), where each row is an available walker.
         :param random:
             random number generator. Use default if None.
     
         :return: proposed move of shape (Nc, dim)
         """
-        if kwargs.get('debug', False):
-            import ipdb
-            ipdb.set_trace()
         rand = np.random.RandomState() if random is None else random
+
         scale = kwargs.get('scale', self.scale)
         beta = kwargs.get('beta', self.beta)
         s = kwargs.get('s', self.s)
@@ -48,26 +49,25 @@ class PCNWalkMove(Proposal):
 
         assert s <= Nc, "%d walkers in ensemble, not enough for %d ensembles" % (Nc, s)
 
-        available_idx = np.arange(Nc)
-
-        # NOTE: probably should use replace=False. Probably that does not matter, not sure.
-        if s is not None:
-            s = Nc
-            # idx = rand.choice(available_idx, [batch_size, s])
-            idx = np.tile(np.arange(Nc), [batch_size, 1])
-            x = ensemble[idx] - np.mean(ensemble[idx], axis=1)[:, None, :]
-            # x = ensemble - np.mean(ensemble, axis=1)[:, None, :]
-            w = rand.normal(size=[batch_size, 1, s])
-            proposal = np.einsum("ijk, ikl -> ijl", w, x).squeeze()
-        else:
+        if not self.ensemble:
+            # use isotropic Gaussian proposal.
             proposal = rand.normal(size=[batch_size, dim])
-
-        sample_mean = np.mean(ensemble, axis=0)
-        if beta is not None:
-            new_pos = np.sqrt(1 - beta ** 2) * sample_mean + beta * proposal
-            # new_pos = walkers_to_move + beta * proposal
+            self.sample_mean = 0
         else:
-            new_pos = sample_mean + scale * proposal
+            if s is None:
+                s = Nc
+            # use first `s` walkers in the ensemble and propose a gaussian with the same cov.
+            idx = np.arange(s)
+            self.sample_mean = np.mean(ensemble[idx], axis=0)
+            self.C = 1.0 / (Nc - 1) * np.dot((ensemble[idx] - self.sample_mean).T, ensemble[idx] - self.sample_mean)
+            proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=self.C, size=batch_size)
+
+        if beta is not None:
+            # use pCN proposal
+            new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
+        else:
+            # use regular random walk proposal
+            new_pos = walkers_to_move + scale * proposal
 
         return new_pos
 
@@ -78,7 +78,8 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1) 
         """
-        if self.beta is None or self.symmetric:
+        if self.beta is None:
             return 0.0
-        diff = y - np.sqrt(1 - self.beta ** 2) * x
-        return -np.sum(np.power(diff, 2), axis=1) / (2.0 * self.beta)
+        diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
+        precision = np.linalg.inv(self.C)
+        return - np.dot(diff, np.dot(precision, diff.T)).squeeze() / 2.0
