@@ -28,7 +28,8 @@ class Distribution(object):
         raise NotImplementedError
 
     def set(self, k, v):
-        try:
-            self.args[k] = v
-        except KeyError:
-            print "No args named %s" % k
+        self.args[k] = v
+
+    def get(self, k):
+        return self.args[k]
+
