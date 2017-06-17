@@ -21,8 +21,7 @@ class MultivariateGaussian(Distribution):
         :param dim (optional): 
             dimension of the gaussian, used to check the eligibility of input parameter
         """
-        if dim is not None:
-            assert len(mu) == dim, "input shape not match, %d != %d" % (mu.shape[0], dim)
+        self.dim = dim or len(mu)
         self._mu = mu
         self._icov = icov
         if icov is None:

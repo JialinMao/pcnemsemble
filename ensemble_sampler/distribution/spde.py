@@ -16,6 +16,7 @@ class SPDE(Distribution):
         :param N: the number of discretization steps to use
         """
         self._N = N
+        self.dim = N
         super(SPDE, self).__init__(N=N)
 
     def get_lnprob(self, x):

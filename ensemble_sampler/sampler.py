@@ -9,19 +9,17 @@ __all__ = ["Sampler"]
 
 class Sampler(object):
 
-    def __init__(self, dim, t_dist, proposal, nwalkers=1, debug=False):
+    def __init__(self, t_dist, proposal, nwalkers=1):
         """
-        :param dim: dimension of the sample space  
         :param t_dist: target distribution
         :param proposal: proposal method
         :param nwalkers: number of walkers to use for sampling, default set to 1 for non-ensemble methods.
         """
-        self.debug = debug
-        self.dim = dim
+        self.dim = t_dist.dim
         self.nwalkers = nwalkers
         self.t_dist = t_dist
         self.proposal = proposal
-        self._history = History(dim=dim, nwalkers=nwalkers)
+        self._history = History(dim=self.dim, nwalkers=nwalkers)
         self._acceptances = np.zeros([self.nwalkers, ])
         self._random = np.random.RandomState()
 
