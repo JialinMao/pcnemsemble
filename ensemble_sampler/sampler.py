@@ -24,72 +24,92 @@ class Sampler(object):
         self._acceptances = np.zeros([self.nwalkers, ])
         self._random = np.random.RandomState()
 
-    def init(self):
+    def sample(self, niter, batch_size=1, p0=None, rstate0=None,
+               store=False, store_every=None, save_dir='./results', title='', **kwargs):
         """
-        Initialize storage in self._history. 
-        """
-        self._history.init()
+        Sampling function, yields position, ln_prob and accepted or not every iteration, 
+        or saves to hdf5 file every `store_every` iterations if store=True.
 
-    def clear(self):
+        :param niter:
+            The number of steps to run.
+        :param batch_size:
+            In each iteration move `batch_size` walkers simultaneously using all other walkers as ensemble.
+        :param p0:
+            The initial position vector.  Can also be None to resume from where :func:``run_mcmc`` left off 
+            the last time it executed.
+        :param rstate0:
+            The initial random state. Use default if None.
+        :param store:
+            Store chain if True, otherwise discard chain and yield results every iteration.
+        :param store_every:
+            How often to save chain to file and free-up memory. Store the entire chain if None.
+        :param save_dir:
+            The directory to save history. 
+        :param title:
+            Title of the saved file.
+        :param kwargs:
+            Optional keywords arguments for proposal / calculating lnprob.
         """
-        Maintain shape of stored history, reset all to 0.
-        """
-        self._history.clear()
+        if rstate0 is not None:
+            self._random.set_state(rstate0)
 
-    def sample(self, niter, batch_size, verbose=False, print_every=1000, store=False,
-               store_every=None, save_dir='./result/', title=None, **kwargs):
-
-        if batch_size is None:
-            batch_size = self.nwalkers // 2
         assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
 
-        try:
-            os.remove(os.path.join(save_dir, title + '.hdf5'))
-        except (OSError, AttributeError):
-            pass
+        self._history.niter = niter
+        self._history.save_every = niter if store_every is None else store_every
+
+        if store:
+            # Remove file if already exist
+            f_name = os.path.join(save_dir, title + '.hdf5')
+            try:
+                os.remove(f_name)
+                print 'removing ' + f_name + '...'
+            except (OSError, AttributeError):
+                pass
+
+        if self._history.curr_pos is None:
+            if kwargs.get('random_start'):
+                p0 = np.random.randn(self.nwalkers * self.dim).reshape([self.nwalkers, -1])
+            if p0 is None:
+                raise ValueError("Cannot have p0=None if run_mcmc has never been called. "
+                                 "Set `random_start=True` in kwargs to use random start")
+            else:
+                self._history.curr_pos = p0
 
         all_walkers = self._history.curr_pos  # (nwalkers, dim)
         ln_probs = self.t_dist.get_lnprob(all_walkers)  # (nwalkers, )
 
         n = self.nwalkers // batch_size
-        debug = False
         for i in xrange(niter):
-            if i >= niter / 2 and self.debug:
-                import ipdb
-                ipdb.set_trace()
-                debug = True
-
-            for k in range(n):
+            for k in xrange(n):
+                # pick walkers to move
                 idx = slice(k * batch_size, (k+1) * batch_size)
-
                 curr_walker = all_walkers[idx]  # (batch_size, dim)
-                curr_lnprob = ln_probs[idx]  # (batch_size, dim)
-
                 ens_idx = np.zeros(self.nwalkers)
                 ens_idx[idx] = -1
-                ensemble = all_walkers[ens_idx >= 0]  # (Nc = nwalkers-batch_size, dim)
+                ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
-                proposal = self.proposal.propose(curr_walker, ensemble, self._random, debug=debug, **kwargs)  # (batch_size, dim)
+                # propose a move
+                proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
 
+                # calculate acceptance probability
+                curr_lnprob = ln_probs[idx]  # (batch_size, )
                 proposal_lnprob = self.t_dist.get_lnprob(proposal)
                 ln_transition_prob_1 = self.proposal.ln_transition_prob(proposal, curr_walker)
                 ln_transition_prob_2 = self.proposal.ln_transition_prob(curr_walker, proposal)
                 ln_acc_prob = (proposal_lnprob + ln_transition_prob_1) - (curr_lnprob + ln_transition_prob_2)  # (batch_size, )
 
+                # accept or reject
                 accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)  # (batch_size, )
 
+                # update history records for next iteration
+                self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])
+                all_walkers = self._history.curr_pos
                 self._acceptances[idx] += accept
                 ln_probs[idx][accept] = proposal_lnprob[accept]
 
-                self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])
-                all_walkers = self._history.curr_pos
-
-            if verbose and i % print_every == 0:
-                print '====iter %s====' % i
-                print 'Acceptance probability: ' + str(np.exp(ln_acc_prob))
-                print 'Accepted: ' + str(accept)
-                # print 'All walkers: ' + str(all_walkers)
-                # print 'ln_probs: ' + str(ln_probs)
+                if kwargs.get('per_walker', False):
+                    yield self._history.curr_pos, ln_probs, accept
 
             if store:
                 if title is None:
