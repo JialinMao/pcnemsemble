@@ -36,8 +36,6 @@ class History(object):
         self._name_to_dim = {'chain': dim}
         self._name_to_dim.update(extra)
 
-        self._history = None
-
         self._history = {k: np.zeros([self.nwalkers, self._max_len, v])
                          for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
 
@@ -65,16 +63,16 @@ class History(object):
         """
         Make sure the file 'save_dir' + 'title' .hdf5 does not exist at the beginning of this run. 
         """
-        self._save_fname = os.path.join(save_dir, title+'.hdf5')
-        print 'saving to ' + self._save_fname + '...'
-        if os.path.isfile(self._save_fname):
-            f = h5py.File(self._save_fname, 'r+')
+        self.save_fname = os.path.join(save_dir, title+'.hdf5')
+        print 'saving to ' + self.save_fname + '...'
+        if os.path.isfile(self.save_fname):
+            f = h5py.File(self.save_fname, 'r+')
             for name in self._name_to_dim.keys():
                 dset = f[name]
                 dset.resize(dset.shape[1] + self._max_len, axis=1)
                 dset[:, -self._max_len:, :] = self._history.get(name)
         else:
-            f = h5py.File(self._save_fname, 'w')
+            f = h5py.File(self.save_fname, 'w')
             for name in self._name_to_dim.keys():
                 dset = f.create_dataset(name, (self.nwalkers, self._max_len, self._name_to_dim[name]), dtype='f',
                                         maxshape=(self.nwalkers, self.niter, self._name_to_dim[name]), chunks=True)
@@ -86,8 +84,8 @@ class History(object):
         Get `name` from history, return all if name is None. 
         if hdf5 is True, return h5py dataset
         """
-        if os.path.isfile(self._save_fname):
-            f = h5py.File(self._save_fname, 'r')
+        if os.path.isfile(self.save_fname):
+            f = h5py.File(self.save_fname, 'r')
             if not isinstance(name, list):
                 dset = f[name] if hdf5 else f[name][::get_every]
             else:
