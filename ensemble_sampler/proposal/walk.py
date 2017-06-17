@@ -46,6 +46,8 @@ class WalkMove(Proposal):
 
         batch_size, dim = walkers_to_move.shape
         Nc, _ = ensemble.shape
+        if s is None:
+            s = Nc  # Use full ensemble if not specified.
 
         assert s <= Nc, "%d walkers in ensemble, not enough for %d ensembles" % (Nc, s)
 
@@ -54,13 +56,12 @@ class WalkMove(Proposal):
             proposal = rand.normal(size=[batch_size, dim])
             self.sample_mean = 0
         else:
-            if s is None:
-                s = Nc
             # use first `s` walkers in the ensemble and propose a gaussian with the same cov.
             idx = np.arange(s)
             self.sample_mean = np.mean(ensemble[idx], axis=0)
-            self.C = 1.0 / (Nc - 1) * np.dot((ensemble[idx] - self.sample_mean).T, ensemble[idx] - self.sample_mean)
-            proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=self.C, size=batch_size)
+            C = 1.0 / (Nc - 1) * np.dot((ensemble[idx] - self.sample_mean).T, ensemble[idx] - self.sample_mean)
+            self.precision = np.linalg.inv(C)
+            proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=batch_size)
 
         if beta is not None:
             # use pCN proposal
@@ -81,5 +82,4 @@ class WalkMove(Proposal):
         if self.beta is None:
             return 0.0
         diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
-        precision = np.linalg.inv(self.C)
-        return - np.dot(diff, np.dot(precision, diff.T)).squeeze() / 2.0
+        return - np.dot(diff, np.dot(self.precision, diff.T)).squeeze() / 2.0
