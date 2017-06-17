@@ -101,58 +101,36 @@ class Sampler(object):
                 if store_every is not None and i % store_every == 0:
                     self._history.save_to(save_dir, title)
                     self._history.clear()
-            else:
-                yield self._history.curr_pos, ln_probs, self._acceptances
 
-    def run_mcmc(self, niter, batch_size=None, p0=None, rstate0=None, verbose=False, print_every=200,
-                 store=False, store_every=None, save_dir=None, title='', **kwargs):
-        """
-        Iterate :func:`sample` for ``N`` iterations and return the result.
+            elif not kwargs.get('per_walker', False):
+                yield self._history.curr_pos, ln_probs, accept
 
-        :param niter:
-            The number of steps to run.
-        :param batch_size:
-            In each iteration move `batch_size` walkers simultaneously using all other walkers as ensemble.
-        :param p0:
-            The initial position vector.  Can also be None to resume from where :func:``run_mcmc`` left off 
-            the last time it executed.
-        :param rstate0:
-            The initial random state. Use default if None.
-        :param verbose:
-            Print information to keep track of sampling process. 
-        :param print_every:
-            How often to print.
-        :param store:
-            Store chain if True, otherwise discard chain and yield results every iteration.
-        :param store_every:
-            How often to save chain to file and free-up memory. Store the entire chain if None.
-        :param save_dir:
-            The directory to save history. 
-        :param title:
-            Title of the saved file.
-        :param kwargs:
-            Optional keywords arguments for proposal / calculating lnprob.
-        """
-        if batch_size is None:
-            batch_size = self.nwalkers // 2
+    def run_mcmc(self, niter, **kwargs):
 
-        assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
-        if rstate0 is not None:
-            self._random.set_state(rstate0)
-        self._history.niter = niter
-        self._history.save_every = niter if store_every is None else store_every
-
-        if self._history.curr_pos is None:
-            if kwargs.get('random_start'):
-                p0 = np.random.randn(self.nwalkers * self.dim).reshape([self.nwalkers, -1])
-            if p0 is None:
-                raise ValueError("Cannot have p0=None if run_mcmc has never been called. "
-                                 "Set `random_start=True` in kwargs to use random start")
-            else:
-                self._history.curr_pos = p0
-
-        for h in self.sample(niter, batch_size, verbose, print_every, store, store_every, save_dir, title, **kwargs):
+        for h in self.sample(niter, **kwargs):
             pass
+
+    def animation(self, niter, save=False, save_name='animation.mp4', realtime=False, **kwargs):
+        """
+        :param niter: number of iterations to run 
+        :param save: whether to save video 
+        :param save_name: the name of saved video 
+        :param realtime: whether to render in real time.
+        :param kwargs: arguments to pass to self.sample function. 
+        :return: matplotlib.animation.FuncAnimation object. Can be converted to HTML5 video tag through
+                 animation.to_html5_video
+        """
+        from matplotlib.animation import FuncAnimation
+        hist = self.sample(niter, **kwargs)
+        visualizer = Visualizer(self.history, realtime, **kwargs)
+        animation = FuncAnimation(fig=visualizer.fig, func=visualizer, init_func=visualizer.init,
+                                  frames=hist, interval=20, blit=True, save_count=self.history.max_len)
+        if save:
+            animation.save(save_name)
+        elif realtime:
+            visualizer.fig.show()
+        else:
+            return animation
 
     def auto_corr(self, low=10, high=None, step=1, c=5, fast=False):
         """
