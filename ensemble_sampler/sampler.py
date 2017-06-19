@@ -56,10 +56,13 @@ class Sampler(object):
         assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
 
         self._history.niter = niter
-        self._history.save_every = niter if store_every is None else store_every
+        self._history.max_len = niter if store_every is None else store_every
 
         if store:
             # Remove file if already exist
+            if title is None:
+                from datetime import datetime
+                title = datetime.now().strftime('%Y-%m-%d_%H:%M')
             f_name = os.path.join(save_dir, title + '.hdf5')
             try:
                 os.remove(f_name)
@@ -112,20 +115,15 @@ class Sampler(object):
                     yield self._history.curr_pos, ln_probs, accept
 
             if store:
-                if title is None:
-                    from datetime import datetime
-                    title = datetime.now().strftime('%Y-%m-%d_%H:%M')
                 itr = i if store_every is None else i % store_every
                 self._history.update(itr=itr, chain=self._history.curr_pos)
                 if store_every is not None and i % store_every == 0:
                     self._history.save_to(save_dir, title)
-                    self._history.clear()
 
             elif not kwargs.get('per_walker', False):
-                yield self._history.curr_pos, ln_probs, accept
+                yield self._history.curr_pos, ln_probs, self._acceptances
 
     def run_mcmc(self, niter, **kwargs):
-
         for h in self.sample(niter, **kwargs):
             pass
 
@@ -139,6 +137,7 @@ class Sampler(object):
         :return: matplotlib.animation.FuncAnimation object. Can be converted to HTML5 video tag through
                  animation.to_html5_video
         """
+        import matplotlib.pyplot as plt
         from matplotlib.animation import FuncAnimation
         hist = self.sample(niter, **kwargs)
         visualizer = Visualizer(self.history, realtime, **kwargs)
@@ -147,7 +146,7 @@ class Sampler(object):
         if save:
             animation.save(save_name)
         elif realtime:
-            visualizer.fig.show()
+            plt.show()
         else:
             return animation
 

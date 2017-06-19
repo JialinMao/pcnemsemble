@@ -35,8 +35,6 @@ print 'mu: ', mu
 print 'cov: ', cov
 
 t_dist = MultivariateGaussian(cov=cov, mu=mu, dim=dim)
-
 proposal = WalkMove(s=s, beta=beta)
-sampler = Sampler(dim=dim, t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
-sampler.run_mcmc(niters, batch_size=1, p0=np.random.randn(dim*nwalkers).reshape([nwalkers, dim]),
-                 verbose=args.verbose, print_every=args.print_every)
+sampler = Sampler(t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
+sampler.run_mcmc(niters, batch_size=1, random_start=True, save=True)
