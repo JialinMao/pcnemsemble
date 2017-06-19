@@ -79,7 +79,7 @@ class WalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1) 
         """
-        if self.beta is None:
+        if self.beta is None or not self.ensemble:
             return 0.0
         diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
-        return - np.dot(diff, np.dot(self.precision, diff.T)).squeeze() / 2.0
+        return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
