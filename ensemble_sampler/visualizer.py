@@ -12,10 +12,10 @@ class Visualizer(object):
     def __init__(self, history, realtime=False, **kwargs):
         self.history = history
         self.nwalkers = history.nwalkers
-        self.N = history.max_len
+        self.N = kwargs.get('max_len', 1)
         self.realtime = realtime
 
-        self.fig = plt.figure(figsize=(10, 10))
+        self.fig = plt.figure(figsize=kwargs.get('figsize', (10, 10)))
 
         self.x_width = (kwargs.get('xmin', -5), kwargs.get('xmax', 5))
         self.y_width = (kwargs.get('ymin', -5), kwargs.get('ymax', 10))
@@ -47,17 +47,21 @@ class Visualizer(object):
         self.ax1.set_xticklabels([])
         self.ax2.set_yticklabels([])
 
-        self.i = 0
+        self.i = -1
+        self.chain = np.empty([self.N, self.nwalkers, 2])
 
     def init(self):
-        self.i = 0
+        self.i = -1
         for line in self.lines.values():
             line.set_data([], [])
         return self.lines.values()
 
     def __call__(self, h):
+        if self.i < 0:
+            self.i += 1
+            return self.lines.values()
         pos, _, _ = h  # pos.shape = [nwalkers, dim]
-        chain = self.history.get('chain')  # chain.shape = [max_len, nwalkers, dim]
+        self.chain[self.i] = pos
         self.i += 1
 
         if self.realtime:
@@ -67,10 +71,10 @@ class Visualizer(object):
 
         for k in range(self.nwalkers):
             x, y = pos[k]
-            self.lines['line%d1' % k].set_data(chain[:, k, 0][::-1][-self.i:], range(self.i))
-            self.lines['line%d2' % k].set_data(range(self.i), chain[:, k, 1][::-1][-self.i:])
-            self.lines['line%d3' % k].set_data(chain[:, k, 0], chain[:, k, 1])
-            self.lines['line%d4' % k].set_data(chain[:, k, 0], chain[:, k, 1])
+            self.lines['line%d1' % k].set_data(self.chain[:, k, 0][::-1][-self.i:], range(self.i))
+            self.lines['line%d2' % k].set_data(range(self.i), self.chain[:, k, 1][::-1][-self.i:])
+            self.lines['line%d3' % k].set_data(self.chain[:, k, 0], self.chain[:, k, 1])
+            self.lines['line%d4' % k].set_data(self.chain[:, k, 0], self.chain[:, k, 1])
             self.lines['line%d5' % k].set_data([x, x], [y, self.y_width[1]])
             self.lines['line%d6' % k].set_data([x, self.x_width[1]], [y, y])
 
