@@ -59,8 +59,13 @@ class WalkMove(Proposal):
             # use first `s` walkers in the ensemble and propose a gaussian with the same cov.
             idx = np.arange(s)
             self.sample_mean = np.mean(ensemble[idx], axis=0)
-            C = 1.0 / (Nc - 1) * np.dot((ensemble[idx] - self.sample_mean).T, ensemble[idx] - self.sample_mean)
-            self.precision = np.linalg.inv(C)
+            # C = 1.0 / (Nc - 1) * np.dot((ensemble[idx] - self.sample_mean).T, ensemble[idx] - self.sample_mean)
+            C = np.cov(ensemble[idx].T)
+            try:
+                self.precision = np.linalg.inv(C)
+            except np.linalg.linalg.LinAlgError:
+                C = np.identity(dim)
+                self.precision = np.identity(dim)
             proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=batch_size)
 
         if beta is not None:
