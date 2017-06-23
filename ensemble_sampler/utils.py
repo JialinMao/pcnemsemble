@@ -1,15 +1,33 @@
 import numpy as np
 import seaborn as sns
+from pandas import DataFrame
 import matplotlib.pyplot as plt
 import timeit
 from emcee.autocorr import *
 
 import ensemble_sampler as es
 
-__all__ = ['plot_hist', 'plot_trajectory', 'run']
+__all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run']
 
 
-def plot_hist(dim, history, start_from=None):
+def plot_acf(chain, max_lag=1000, mean_first=False):
+    if mean_first:
+        acf = function(np.mean(chain, axis=0))
+        title = 'Mean of walkers first'
+    else:
+        acf = np.zeros_like(chain)
+        for i in range(acf.shape[0]):
+            acf[i] = function(chain[i])
+        acf = np.mean(acf, axis=0)
+        title = 'Mean of acf'
+    data = DataFrame(acf[:max_lag], columns=['dim_1','dim_2'])
+    ax = data.plot()
+    sns.set_style("whitegrid", {'axes.grid' : False})
+    ax.set(xlabel='lag', ylabel='ACF', title=title)
+    plt.show()
+
+
+def plot_hist(dim, history, start_from=None, normalize=False, show=False):
     """
     Plot histogram of history for chosen dimension(s). dim is an integer array.
     """
@@ -20,9 +38,10 @@ def plot_hist(dim, history, start_from=None):
     fig.suptitle("Sample history histogram, dim=%s, num_steps=%s" % (dim, num_steps))
     for i in range(len(dim)):
         idx = i if n == 1 or n == 2 else (i // 2, i % 2)
-        axs[idx].hist(history[start_from:, dim[i]], 100, histtype='step')
+        axs[idx].hist(history[start_from:, dim[i]], 100, histtype='step', normed=normalize)
         axs[idx].set_title("Dim %s histogram" % int(i+1))
-    plt.show()
+    if show:
+        plt.show()
 
 
 def plot_trajectory(dim, history, start_from=0):
