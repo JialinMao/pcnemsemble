@@ -117,7 +117,7 @@ class Sampler(object):
             if store:
                 itr = i if store_every is None else i % store_every
                 self._history.update(itr=itr, chain=self._history.curr_pos)
-                if store_every is not None and i % store_every == 0:
+                if store_every is not None and (i+1) % store_every == 0:
                     self._history.save_to(save_dir, title)
 
             elif not kwargs.get('per_walker', False):

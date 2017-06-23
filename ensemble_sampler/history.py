@@ -91,17 +91,17 @@ class History(object):
                 print err
                 print 'Supported keys: %s' % str(self._dict.keys())
 
-    def get_flat(self, name=None):
+    def get_flat(self, name=None, get_every=1, hdf5=False):
         """
         Get history flattened along the `nwalkers` axis, of shape [niter, dim_of_data]. 
         :param name: (optional) the name of the history to get, can be a list. Return all if None.
         :return: Dictionary of inquired history {name: value}.
         """
         if not isinstance(name, list):
-            return self._dict.get(name).reshape([-1, self._name_to_dim.get(name)])
+            return self.get(name, get_every, hdf5).reshape([-1, self._name_to_dim.get(name)])
         idx = self._dict.keys() if name is None else name
         try:
-            return dict([(i, self._dict.get(i).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
+            return dict([(i, self.get(i, get_every, hdf5).reshape([-1, self._name_to_dim.get(i)])) for i in idx])
         except KeyError, err:
             print err
             print 'Supported keys: %s' % str(self._dict.keys())
