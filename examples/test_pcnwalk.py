@@ -16,7 +16,6 @@ args = parser.parse_args()
 
 print args
 
-
 dim = args.dim
 nwalkers = args.nwalkers
 niters = args.niters
@@ -24,17 +23,10 @@ niters = args.niters
 s = args.s
 beta = args.beta
 
-mu = np.random.randn(dim)
-
-cov = 0.5 - np.random.rand(dim ** 2).reshape((dim, dim))
-cov = np.triu(cov)
-cov += cov.T - np.diag(cov.diagonal())
-cov = np.dot(cov, cov)
-
-print 'mu: ', mu
-print 'cov: ', cov
+mu = np.zeros(dim)
+cov = np.identity(dim)
 
 t_dist = MultivariateGaussian(cov=cov, mu=mu, dim=dim)
-proposal = WalkMove(s=s, beta=beta)
+proposal = WalkMove(ensemble=True, s=s, beta=beta)
 sampler = Sampler(t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
 sampler.run_mcmc(niters, batch_size=1, random_start=True, save=True)
