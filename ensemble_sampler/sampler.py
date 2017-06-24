@@ -94,16 +94,7 @@ class Sampler(object):
                 ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
                 # propose a move
-                try:
-                    proposal, proposal_extra = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
-                    if proposal_extra is not None and 'proposal_extra' not in self._history.names:
-                        self._history.add_extra({'proposal_extra': len(proposal_extra)})
-                    if store:
-                        itr = i if store_every is None else i % store_every
-                        self._history.update(itr=itr, walker_idx=k, proposal_extra=proposal_extra)
-                except np.linalg.linalg.LinAlgError, err:
-                    print i, k
-                    raise err
+                proposal, proposal_extra = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
