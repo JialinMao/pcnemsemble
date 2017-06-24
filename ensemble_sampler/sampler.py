@@ -73,6 +73,7 @@ class Sampler(object):
         if self._history.curr_pos is None:
             if kwargs.get('random_start'):
                 p0 = np.random.randn(self.nwalkers * self.dim).reshape([self.nwalkers, -1])
+                print 'start location: ', p0
             if p0 is None:
                 raise ValueError("Cannot have p0=None if run_mcmc has never been called. "
                                  "Set `random_start=True` in kwargs to use random start")
@@ -93,7 +94,16 @@ class Sampler(object):
                 ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
                 # propose a move
-                proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
+                try:
+                    proposal, proposal_extra = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
+                    if proposal_extra is not None and 'proposal_extra' not in self._history.names:
+                        self._history.add_extra({'proposal_extra': len(proposal_extra)})
+                    if store:
+                        itr = i if store_every is None else i % store_every
+                        self._history.update(itr=itr, walker_idx=k, proposal_extra=proposal_extra)
+                except np.linalg.linalg.LinAlgError, err:
+                    print i, k
+                    raise err
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )

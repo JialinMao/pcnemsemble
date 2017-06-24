@@ -35,6 +35,11 @@ class History(object):
         self._dict = {k: np.zeros([self.nwalkers, self._max_len, v])
                       for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
 
+    def add_extra(self, extra={}):
+        self._name_to_dim.update(extra)
+        self._dict.update({k: np.zeros([self.nwalkers, self._max_len, v])
+                           for k, v in zip(extra.keys(), extra.values())})
+
     def update(self, itr, walker_idx=slice(None), **kwargs):
         """
         Updating the information of _walker_idx_th walker.
@@ -128,6 +133,10 @@ class History(object):
         return self._dict
 
     @property
+    def names(self):
+        return self._dict.keys()
+
+    @property
     def max_len(self):
         return self._max_len
 
@@ -136,4 +145,5 @@ class History(object):
         self._max_len = N
         self._dict = {k: np.zeros([self.nwalkers, self._max_len, v])
                       for k, v in zip(self._name_to_dim.keys(), self._name_to_dim.values())}
+
 
