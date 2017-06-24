@@ -30,7 +30,7 @@ class StretchMove(Proposal):
 
         new_pos = c_walkers + self.z * (walkers_to_move - c_walkers)
 
-        return new_pos
+        return new_pos, None
 
     def ln_transition_prob(self, x, y):
         """

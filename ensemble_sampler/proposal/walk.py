@@ -71,7 +71,7 @@ class WalkMove(Proposal):
             # use regular random walk proposal
             new_pos = walkers_to_move + scale * proposal
 
-        return new_pos
+        return new_pos, None
 
     def ln_transition_prob(self, x, y):
         """
@@ -108,7 +108,7 @@ class PCNWalkMove(Proposal):
         :param random:
             random number generator. Use default if None.
     
-        :return: proposed move of shape (Nc, dim)
+        :return: proposed move of shape (Nc, dim), extra info for debugging
         """
         rand = np.random.RandomState() if random is None else random
 
@@ -126,14 +126,14 @@ class PCNWalkMove(Proposal):
 
         new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
 
-        return new_pos, C
+        return new_pos, C.ravel()
 
     def ln_transition_prob(self, x, y):
         """
         Calculate ln transition probability from x -> y
         :param x: start position, shape=(batch_size, dim) 
         :param y: end position, shape=(batch_size, dim) 
-        :return: prob, shape=(batch_size, 1) 
+        :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
         diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
         return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
