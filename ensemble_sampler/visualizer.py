@@ -48,7 +48,7 @@ class Visualizer(object):
         self.ax2.set_yticklabels([])
 
         self.i = -1
-        self.chain = np.empty([self.N, self.nwalkers, 2])
+        self.chain = None
 
     def init(self):
         self.i = -1
@@ -57,11 +57,20 @@ class Visualizer(object):
         return self.lines.values()
 
     def __call__(self, h):
+
         if self.i < 0:
             self.i += 1
+            if isinstance(h, int):
+                self.chain = self.history.get('chain')
+            else:
+                self.chain = np.empty([self.nwalkers, self.N, 2])
             return self.lines.values()
-        pos, _, _ = h  # pos.shape = [nwalkers, dim]
-        self.chain[self.i] = pos
+
+        if isinstance(h, int):
+            pos = self.chain[:, h, :]
+        else:
+            pos, _, _ = h  # pos.shape = [nwalkers, dim]
+            self.chain[:, self.i, :] = pos
         self.i += 1
 
         if self.realtime:
@@ -71,10 +80,10 @@ class Visualizer(object):
 
         for k in range(self.nwalkers):
             x, y = pos[k]
-            self.lines['line%d1' % k].set_data(self.chain[:, k, 0][::-1][-self.i:], range(self.i))
-            self.lines['line%d2' % k].set_data(range(self.i), self.chain[:, k, 1][::-1][-self.i:])
-            self.lines['line%d3' % k].set_data(self.chain[:, k, 0], self.chain[:, k, 1])
-            self.lines['line%d4' % k].set_data(self.chain[:, k, 0], self.chain[:, k, 1])
+            self.lines['line%d1' % k].set_data(self.chain[k, :, 0][::-1][-self.i:], range(self.i))
+            self.lines['line%d2' % k].set_data(range(self.i), self.chain[k, :, 1][::-1][-self.i:])
+            self.lines['line%d3' % k].set_data(self.chain[k, :, 0], self.chain[k, :, 1])
+            self.lines['line%d4' % k].set_data(self.chain[k, :, 0], self.chain[k, :, 1])
             self.lines['line%d5' % k].set_data([x, x], [y, self.y_width[1]])
             self.lines['line%d6' % k].set_data([x, self.x_width[1]], [y, y])
 
