@@ -27,6 +27,6 @@ mu = np.zeros(dim)
 cov = np.identity(dim)
 
 t_dist = MultivariateGaussian(cov=cov, mu=mu, dim=dim)
-proposal = WalkMove(ensemble=True, s=s, beta=beta)
+proposal = PCNWalkMove(beta=beta)
 sampler = Sampler(t_dist=t_dist, proposal=proposal, nwalkers=nwalkers)
 sampler.run_mcmc(niters, batch_size=1, random_start=True, save=True)

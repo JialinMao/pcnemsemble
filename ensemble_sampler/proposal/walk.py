@@ -126,7 +126,7 @@ class PCNWalkMove(Proposal):
 
         new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
 
-        return new_pos
+        return new_pos, C
 
     def ln_transition_prob(self, x, y):
         """
@@ -135,7 +135,5 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1) 
         """
-        if self.beta is None or not self.ensemble:
-            return 0.0
         diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
         return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
