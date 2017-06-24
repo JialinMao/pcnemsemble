@@ -93,12 +93,7 @@ class Sampler(object):
                 ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
                 # propose a move
-                try:
-                    proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
-                except np.linalg.linalg.LinAlgError, err:
-                    print i
-                    print all_walkers
-                    raise err
+                proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
