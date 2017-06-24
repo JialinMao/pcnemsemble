@@ -117,14 +117,14 @@ class PCNWalkMove(Proposal):
         batch_size, dim = walkers_to_move.shape
         Nc, _ = ensemble.shape
 
-        # use first `s` walkers in the ensemble and propose a gaussian with the same cov.
         self.sample_mean = np.mean(ensemble, axis=0)
         diff = ensemble - self.sample_mean
         C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
         self.precision = np.linalg.inv(C)
         proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=batch_size)
 
-        new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
+        # new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
+        new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
 
         return new_pos, C.ravel()
 
@@ -135,5 +135,6 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
-        diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
+        # diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
+        diff = y - np.sqrt(1 - self.beta ** 2) * x
         return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
