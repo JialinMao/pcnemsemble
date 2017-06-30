@@ -100,6 +100,8 @@ class History(object):
         """
         Get history flattened along the `nwalkers` axis, of shape [niter, dim_of_data]. 
         :param name: (optional) the name of the history to get, can be a list. Return all if None.
+        :param get_every: (optional) get every _ iterations
+        :param hdf5: return hdf5 file object if True
         :return: Dictionary of inquired history {name: value}.
         """
         if not isinstance(name, list):

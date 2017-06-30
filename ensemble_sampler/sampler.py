@@ -22,6 +22,7 @@ class Sampler(object):
         self.proposal = proposal
         self._history = History(dim=self.dim, nwalkers=nwalkers)
         self._acceptances = np.zeros([self.nwalkers, ])
+        self._accepted = None
         self._random = np.random.RandomState()
 
     def sample(self, niter, batch_size=1, p0=None, rstate0=None,
@@ -59,6 +60,7 @@ class Sampler(object):
         self._history.max_len = niter if store_every is None else store_every
 
         if store:
+            self._accepted = np.zeros([self.nwalkers, niter])
             # Remove file if already exist
             if title is None:
                 from datetime import datetime
@@ -94,7 +96,14 @@ class Sampler(object):
                 ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
                 # propose a move
-                proposal, proposal_extra = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('error')
+                    try:
+                        proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
+                    except Warning as e:
+                        print i, k
+                        print('error found:', e)
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
@@ -105,6 +114,7 @@ class Sampler(object):
 
                 # accept or reject
                 accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)  # (batch_size, )
+                self._accepted[idx, i] = accept
 
                 # update history records for next iteration
                 self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])
@@ -143,7 +153,7 @@ class Sampler(object):
         hist = self.sample(niter, **kwargs)
         visualizer = Visualizer(self.history, realtime, **kwargs)
         animation = FuncAnimation(fig=visualizer.fig, func=visualizer, init_func=visualizer.init,
-                                  frames=hist, interval=20, blit=True, save_count=self.history.max_len)
+                                  frames=hist, interval=20, blit=True, save_count=self.history.max_len, **kwargs)
         if save:
             animation.save(save_name)
         elif realtime:
@@ -173,3 +183,7 @@ class Sampler(object):
     @property
     def acceptance(self):
         return self._acceptances
+
+    @property
+    def accepted(self):
+        return self._accepted

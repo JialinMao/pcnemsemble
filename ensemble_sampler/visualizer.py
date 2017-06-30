@@ -49,6 +49,7 @@ class Visualizer(object):
 
         self.i = -1
         self.chain = None
+        self.print_every = kwargs.get('print_every', 100)
 
     def init(self):
         self.i = -1
@@ -73,6 +74,8 @@ class Visualizer(object):
             self.chain[:, self.i, :] = pos
         self.i += 1
 
+        if self.i % self.print_every == 0:
+            print self.i
         if self.realtime:
             self.ax1.figure.canvas.draw()
             self.ax2.figure.canvas.draw()
@@ -82,8 +85,8 @@ class Visualizer(object):
             x, y = pos[k]
             self.lines['line%d1' % k].set_data(self.chain[k, :, 0][::-1][-self.i:], range(self.i))
             self.lines['line%d2' % k].set_data(range(self.i), self.chain[k, :, 1][::-1][-self.i:])
-            self.lines['line%d3' % k].set_data(self.chain[k, :, 0], self.chain[k, :, 1])
-            self.lines['line%d4' % k].set_data(self.chain[k, :, 0], self.chain[k, :, 1])
+            self.lines['line%d3' % k].set_data(self.chain[k, :self.i, 0], self.chain[k, :self.i, 1])
+            self.lines['line%d4' % k].set_data(self.chain[k, :self.i, 0], self.chain[k, :self.i, 1])
             self.lines['line%d5' % k].set_data([x, x], [y, self.y_width[1]])
             self.lines['line%d6' % k].set_data([x, self.x_width[1]], [y, y])
 
