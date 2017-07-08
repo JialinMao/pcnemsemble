@@ -3,14 +3,14 @@ import numpy as np
 from emcee.autocorr import *
 
 from history import History
-from visualizer import Visualizer
+from utils import *
 
 __all__ = ["Sampler"]
 
 
 class Sampler(object):
 
-    def __init__(self, t_dist, proposal, nwalkers=1):
+    def __init__(self, t_dist, proposal, nwalkers=1, visualizer=None):
         """
         :param t_dist: target distribution
         :param proposal: proposal method
@@ -20,10 +20,10 @@ class Sampler(object):
         self.nwalkers = nwalkers
         self.t_dist = t_dist
         self.proposal = proposal
+
         self._history = History(dim=self.dim, nwalkers=nwalkers)
-        self._acceptances = np.zeros([self.nwalkers, ])
-        self._accepted = None
         self._random = np.random.RandomState()
+        self._visualizer = visualizer
 
     def sample(self, niter, batch_size=1, p0=None, rstate0=None,
                store=False, store_every=None, save_dir='./results', title='', **kwargs):
@@ -60,22 +60,12 @@ class Sampler(object):
         self._history.max_len = niter if store_every is None else store_every
 
         if store:
-            self._accepted = np.zeros([self.nwalkers, niter])
             # Remove file if already exist
-            if title is None:
-                from datetime import datetime
-                title = datetime.now().strftime('%Y-%m-%d_%H:%M')
-            f_name = os.path.join(save_dir, title + '.hdf5')
-            try:
-                os.remove(f_name)
-                print 'removing ' + f_name + '...'
-            except (OSError, AttributeError):
-                pass
+            remove_f(title, save_dir)
 
         if self._history.curr_pos is None:
             if kwargs.get('random_start'):
                 p0 = np.random.randn(self.nwalkers * self.dim).reshape([self.nwalkers, -1])
-                print 'start location: ', p0
             if p0 is None:
                 raise ValueError("Cannot have p0=None if run_mcmc has never been called. "
                                  "Set `random_start=True` in kwargs to use random start")
@@ -87,6 +77,11 @@ class Sampler(object):
 
         n = self.nwalkers // batch_size
         for i in xrange(niter):
+            if store:
+                self._history.update(itr=i, chain=self._history.curr_pos)
+                if store_every is not None and (i+1) % store_every == 0:
+                    self._history.save_to(save_dir, title)
+
             for k in xrange(n):
                 # pick walkers to move
                 idx = slice(k * batch_size, (k+1) * batch_size)
@@ -100,39 +95,33 @@ class Sampler(object):
                 with warnings.catch_warnings():
                     warnings.filterwarnings('error')
                     try:
-                        proposal = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)  # (batch_size, dim)
+                        proposal, blob = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)
+                        if i == 0 and k == 0 and blob is not None and store:
+                            name_to_dim = dict([(key, blob[key].shape[1]) for key in blob.keys()])
+                            self.history.add_extra(name_to_dim)
+                        if store:
+                            self.history.update(i, idx, **blob)
                     except Warning as e:
-                        print i, k
-                        print('error found:', e)
+                        print 'iteration: ', i
+                        print 'walker: ', idx
+                        print 'error found:', e
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
                 proposal_lnprob = self.t_dist.get_lnprob(proposal)
                 ln_transition_prob_1 = self.proposal.ln_transition_prob(proposal, curr_walker)
                 ln_transition_prob_2 = self.proposal.ln_transition_prob(curr_walker, proposal)
-                ln_acc_prob = (proposal_lnprob + ln_transition_prob_1) - (curr_lnprob + ln_transition_prob_2)  # (batch_size, )
+                ln_acc_prob = (proposal_lnprob + ln_transition_prob_1) - (curr_lnprob + ln_transition_prob_2)
 
                 # accept or reject
-                accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)  # (batch_size, )
-                self._accepted[idx, i] = accept
+                accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)
+                if store:
+                    self._history.update(i, idx, accepted=accept)
 
                 # update history records for next iteration
                 self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])
                 all_walkers = self._history.curr_pos
-                self._acceptances[idx] += accept
                 ln_probs[idx][accept] = proposal_lnprob[accept]
-
-                if kwargs.get('per_walker', False):
-                    yield self._history.curr_pos, ln_probs, accept
-
-            if store:
-                itr = i if store_every is None else i % store_every
-                self._history.update(itr=itr, chain=self._history.curr_pos)
-                if store_every is not None and (i+1) % store_every == 0:
-                    self._history.save_to(save_dir, title)
-
-            elif not kwargs.get('per_walker', False):
-                yield self._history.curr_pos, ln_probs, self._acceptances
 
     def run_mcmc(self, niter, **kwargs):
         for h in self.sample(niter, **kwargs):
@@ -151,7 +140,7 @@ class Sampler(object):
         import matplotlib.pyplot as plt
         from matplotlib.animation import FuncAnimation
         hist = self.sample(niter, **kwargs)
-        visualizer = Visualizer(self.history, realtime, **kwargs)
+        visualizer = self._visualizer(self.history, realtime, **kwargs)
         animation = FuncAnimation(fig=visualizer.fig, func=visualizer, init_func=visualizer.init,
                                   frames=hist, interval=20, blit=True, save_count=self.history.max_len, **kwargs)
         if save:
@@ -167,6 +156,7 @@ class Sampler(object):
         """
         chain = self.t_dist.get_auto_corr_f(np.mean(self._history.get('chain'), axis=0))
         return integrated_time(chain, axis=0, low=low, high=high, step=step, c=c, fast=fast)
+
 
     @property
     def history(self):
@@ -187,3 +177,11 @@ class Sampler(object):
     @property
     def accepted(self):
         return self._accepted
+
+    @property
+    def visualizer(self):
+        return self._visualizer
+
+    @visualizer.setter
+    def visualizer(self, vis):
+        self._visualizer = vis

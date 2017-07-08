@@ -1,3 +1,7 @@
+"""
+Static helper functions/.
+"""
+
 import numpy as np
 import seaborn as sns
 from pandas import DataFrame
@@ -7,10 +11,11 @@ from emcee.autocorr import *
 
 import ensemble_sampler as es
 
-__all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run']
+__all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run', 'remove_f']
 
 
 def plot_acf(chain, max_lag=1000, mean_first=False):
+    dim = chain.shape[2]
     if mean_first:
         acf = function(np.mean(chain, axis=0))
         title = 'Mean of walkers first'
@@ -20,9 +25,10 @@ def plot_acf(chain, max_lag=1000, mean_first=False):
             acf[i] = function(chain[i])
         acf = np.mean(acf, axis=0)
         title = 'Mean of acf'
-    data = DataFrame(acf[:max_lag], columns=['dim_1','dim_2'])
+    cols = ['dim_%s' % i for i in range(dim)]
+    data = DataFrame(acf[:max_lag], columns=cols)
     ax = data.plot()
-    sns.set_style("whitegrid", {'axes.grid' : False})
+    sns.set_style("whitegrid", {'axes.grid': False})
     ax.set(xlabel='lag', ylabel='ACF', title=title)
     plt.show()
 
@@ -91,5 +97,16 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
         fig.savefig(title)
 
 
+def remove_f(title, save_dir):
+    import os
+    if title is None:
+        from datetime import datetime
+        title = datetime.now().strftime('%Y-%m-%d_%H:%M')
+    f_name = os.path.join(save_dir, title + '.hdf5')
+    try:
+        os.remove(f_name)
+        print 'removing ' + f_name + '...'
+    except (OSError, AttributeError):
+        pass
 
 

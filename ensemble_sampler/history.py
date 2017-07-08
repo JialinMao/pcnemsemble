@@ -29,7 +29,7 @@ class History(object):
 
         self._max_len = save_every or niter
 
-        self._name_to_dim = {'chain': dim}
+        self._name_to_dim = {'chain': dim, 'accepted': 1}
         self._name_to_dim.update(extra)
 
         self._dict = {k: np.zeros([self.nwalkers, self._max_len, v])
@@ -45,6 +45,8 @@ class History(object):
         Updating the information of _walker_idx_th walker.
         Info is passed in through kwargs in the form name=data
         """
+        if itr >= self._max_len:
+            itr = itr % self._max_len
         for k in self._dict.keys():
             if kwargs.get(k) is not None:
                 self._dict[k][walker_idx, itr, :] = kwargs.get(k)

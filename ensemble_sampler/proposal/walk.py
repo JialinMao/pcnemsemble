@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 from proposal import Proposal
 
@@ -71,7 +72,9 @@ class WalkMove(Proposal):
             # use regular random walk proposal
             new_pos = walkers_to_move + scale * proposal
 
-        return new_pos
+        blobs = {'x': proposal, 'new_pos': new_pos}
+
+        return new_pos, blobs
 
     def ln_transition_prob(self, x, y):
         """
@@ -125,8 +128,9 @@ class PCNWalkMove(Proposal):
 
         new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
         # new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
+        blobs = {'x': proposal, 'new_pos': new_pos}
 
-        return new_pos
+        return new_pos, blobs
 
     def ln_transition_prob(self, x, y):
         """
