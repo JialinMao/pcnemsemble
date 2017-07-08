@@ -50,6 +50,8 @@ class History(object):
         for k in self._dict.keys():
             if kwargs.get(k) is not None:
                 self._dict[k][walker_idx, itr, :] = kwargs.get(k)
+                if k == 'chain':
+                    self.move(kwargs.get(k), walker_idx=walker_idx)
 
     def move(self, new_pos, walker_idx=slice(None)):
         self.curr_pos[walker_idx] = new_pos
