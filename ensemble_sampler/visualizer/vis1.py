@@ -1,13 +1,10 @@
-"""
-A visualizer for low dimensional target distribution, with not too many walkers.
-Similar to http://twiecki.github.io/blog/2014/01/02/visualizing-mcmc/.
-"""
 from pylab import *
+from visualizer import Visualizer
 
-__all__ = ['Visualizer']
+__all__ = ['Visualizer1']
 
 
-class Visualizer(object):
+class Visualizer1(Visualizer):
 
     def __init__(self, history, realtime=False, **kwargs):
         self.history = history
@@ -50,6 +47,7 @@ class Visualizer(object):
         self.i = -1
         self.chain = None
         self.print_every = kwargs.get('print_every', 100)
+        super(Visualizer, self).__init__()
 
     def init(self):
         self.i = -1
