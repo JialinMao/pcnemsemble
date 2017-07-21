@@ -117,6 +117,8 @@ class Sampler(object):
                 accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)
                 if store:
                     self._history.update(i, idx, accepted=accept)
+                else:
+                    yield self._history.curr_pos, proposal, accept
 
                 # update history records for next iteration
                 self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])

@@ -99,6 +99,8 @@ class PCNWalkMove(Proposal):
         """
         assert 0 <= beta <= 1, "beta must be in [0, 1]"
         self.beta = beta
+        self.sample_mean = None
+        self.precision = None
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
@@ -117,17 +119,21 @@ class PCNWalkMove(Proposal):
 
         beta = kwargs.get('beta', self.beta)
 
-        batch_size, dim = walkers_to_move.shape
-        Nc, _ = ensemble.shape
+        Nc, dim = ensemble.shape
 
         self.sample_mean = np.mean(ensemble, axis=0)
         diff = ensemble - self.sample_mean
         C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
         self.precision = np.linalg.inv(C)
-        proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=batch_size)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error')
+            try:
+                proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=1)
+            except Warning as e:
+                raise e
 
         new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
-        # new_pos = np.sqrt(1 - beta ** 2) * walkers_to_move + beta * proposal
         blobs = {'x': proposal, 'new_pos': new_pos}
 
         return new_pos, blobs
@@ -140,5 +146,4 @@ class PCNWalkMove(Proposal):
         :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
         diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
-        # diff = y - np.sqrt(1 - self.beta ** 2) * x
         return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
