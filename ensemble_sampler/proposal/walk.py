@@ -145,5 +145,5 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
-        diff = y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean
+        diff = (y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean) / self.beta
         return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0

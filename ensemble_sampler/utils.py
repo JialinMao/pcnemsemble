@@ -14,7 +14,7 @@ import ensemble_sampler as es
 __all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run', 'remove_f']
 
 
-def plot_acf(chain, max_lag=1000, mean_first=False):
+def plot_acf(chain, max_lag=1000, mean_first=False, save=None):
     dim = chain.shape[2]
     if mean_first:
         acf = function(np.mean(chain, axis=0))
@@ -31,6 +31,8 @@ def plot_acf(chain, max_lag=1000, mean_first=False):
     sns.set_style("whitegrid", {'axes.grid': False})
     ax.set(xlabel='lag', ylabel='ACF', title=title)
     plt.show()
+    if save is not None:
+        plt.savefig(save)
 
 
 def plot_hist(dim, history, start_from=None, normalize=False, show=False):

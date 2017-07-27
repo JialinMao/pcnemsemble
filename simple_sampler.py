@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
+from ensemble_sampler.utils import *
 
 
 def lnprob(x):
@@ -9,19 +10,14 @@ def lnprob(x):
 
 
 def transition_ln_prob(x, y, ens_mean, icov, beta, mode):
-    if mode == 'pcn_1':
-        mu = x + np.sqrt(1 - beta ** 2) * (ens_mean - x)
-        diff = np.expand_dims(y - mu, axis=0)
-        return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
-    elif mode == 'pcn_2':
+    if mode == 'pcn':
         mu = ens_mean + np.sqrt(1 - beta ** 2) * (x - ens_mean)
-        diff = np.expand_dims(y - mu, axis=0)
-        return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
     elif mode == 'old':
-        diff = np.expand_dims((y - np.sqrt(1 - beta ** 2) * x) / beta, axis=0)
-        return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
+        mu = np.sqrt(1 - beta ** 2) * x
     else:
         return 0.0
+    diff = np.expand_dims((y - mu) / beta, axis=0)
+    return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
 
 
 def propose(curr_walker, ensemble, beta, dim, mode='pcn'):
@@ -31,21 +27,16 @@ def propose(curr_walker, ensemble, beta, dim, mode='pcn'):
     W = np.random.multivariate_normal(np.atleast_1d(np.zeros(dim)), ens_cov)
     if mode == 'pcn':
         proposal = ens_mean + np.sqrt(1 - beta ** 2) * (curr_walker - ens_mean) + beta * W
-        trans_ln_prob_1 = transition_ln_prob(proposal, curr_walker, ens_mean, ens_icov, beta, 'pcn_2')
-        trans_ln_prob_2 = transition_ln_prob(curr_walker, proposal, ens_mean, ens_icov, beta, 'pcn_2')
+    elif mode == 'old':
+        proposal = np.sqrt(1 - beta ** 2) * curr_walker + beta * W
     else:
-        if mode == 'old':
-            proposal = np.sqrt(1 - beta ** 2) * curr_walker + beta * W
-        else:
-            proposal = curr_walker + beta * W
-        trans_ln_prob_1 = transition_ln_prob(proposal, curr_walker, ens_mean, ens_icov, beta, mode)
-        trans_ln_prob_2 = transition_ln_prob(curr_walker, proposal, ens_mean, ens_icov, beta, mode)
+        proposal = curr_walker + beta * W
+    trans_ln_prob_1 = transition_ln_prob(proposal, curr_walker, ens_mean, ens_icov, beta, mode)
+    trans_ln_prob_2 = transition_ln_prob(curr_walker, proposal, ens_mean, ens_icov, beta, mode)
     return proposal, ens_icov, ens_mean, trans_ln_prob_1, trans_ln_prob_2
 
 
 def sample(niter, p0, nwalkers, dim, beta, mode='pcn'):
-    # import ipdb; ipdb.set_trace()
-    # p0.shape = (L, n)
     curr_pos = p0
     curr_lnprob = lnprob(p0)
     for i in xrange(niter):
@@ -60,37 +51,62 @@ def sample(niter, p0, nwalkers, dim, beta, mode='pcn'):
             if accept:
                 curr_pos[k] = proposal
                 curr_lnprob[k] = ln_proposal_prob
-            yield proposal, accept, curr_pos, curr_walker, ens_icov, ens_mean
+            yield curr_walker, ensemble, proposal, accept, ens_icov, ens_mean, i, k
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--niter', type=int, default=8000)
-    parser.add_argument('--nwalkers', type=int, default=4)
+    parser.add_argument('--nwalkers', type=int, default=10)
     parser.add_argument('--beta', type=float, default=0.8)
     parser.add_argument('--dim', type=int, default=2)
-    parser.add_argument('--seed', type=int, default=123)
+    parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--mode', type=str, default='pcn')
-    parser.add_argument('--vis-every', type=int, default=2000)
+    parser.add_argument('--vis-every', type=int, default=200)
+    parser.add_argument('--name', type=str, default=None)
+    parser.add_argument('--max-lag', type=int, default=1000)
     args = parser.parse_args()
 
-    np.random.seed(args.seed)
+    if args.seed:
+        np.random.seed(args.seed)
     p0 = np.random.randn(args.nwalkers, args.dim)
 
-    i = 0
+    # 1st to 4th moments for each walker
+    moments = np.zeros([args.nwalkers, 14])
+    history = np.zeros([args.nwalkers, args.niter, args.dim])
+
     plt.ion()
+    count = 0
     for h in sample(args.niter, p0, args.nwalkers, args.dim, args.beta, args.mode):
-        proposal, accept, curr_pos, curr_walker, ens_icov, ens_mean = h
-        n = i // args.nwalkers
-        k = i % args.nwalkers
-        if (n % args.vis_every) == 0 and k == 0:
+        curr_walker, ensemble, proposal, accept, ens_icov, ens_mean, i, k = h
+        x, y = proposal if accept else curr_walker
+
+        if k == 0:
+            history[1:, i, :] = ensemble
+            history[0, i, :] = x, y
+
+        m = np.array([x, y,
+                      x*x, x*y, y*y,
+                      x**3, x**2*y, x*y**2, y**3,
+                      x**4, x**3*y, x**2*y**2, x*y**3, y**4])
+        moments[k, :] += m
+        count += 1.0 / args.nwalkers
+
+        if i % args.vis_every == 0 and k == 0:
+            avg_moments = np.mean(moments / count, axis=0) 
+            print 'moments after sweep %s: ' % i  
+            print '(x, y): ', avg_moments[:2] 
+            print '(xx, xy, yy): ', avg_moments[2:5] 
+            print '(xxx, xxy, xyy, yyy): ', avg_moments[5:9] 
+            print '(xxxx, xxxy, xxyy, xyyy, yyyy): ', avg_moments[9:] 
+
             plt.cla()
             plt.axis([-5, 5, -5, 5])
             plt.grid()
 
-            x_coords = np.array(curr_pos[:, 0]).flatten()
-            y_coords = np.array(curr_pos[:, 1]).flatten()
-            plt.scatter(x_coords, y_coords, label='walkers')
+            x_coords = np.array(np.concatenate([ensemble[:, 0], np.atleast_1d(x)])).flatten()
+            y_coords = np.array(np.concatenate([ensemble[:, 1], np.atleast_1d(y)])).flatten()
+            plt.scatter(x_coords, y_coords, label='ensemble')
 
             nth = 200
             th = np.linspace(0, 2 * np.pi, nth, endpoint=False)
@@ -106,17 +122,17 @@ def main():
             wsize = np.array([40])
             plt.scatter(cx, cy, c='k', s=wsize, label='ensemble mean')
 
-            x = curr_walker.squeeze()
-            y = proposal.squeeze()
-            plt.scatter(x[0], x[1], marker='x', c='r', s=64., label='x')
-            plt.scatter(y[0], y[1], marker='x', c='g', s=64., label='y')
+            plt.scatter(curr_walker[0], curr_walker[1], marker='x', c='r', s=64., label='curr_walker')
+            plt.scatter(proposal[0], proposal[1], marker='x', c='g', s=64., label='proposal')
 
-            title = "after sweep " + str(n) + ", with beta = " + str(args.beta)
+            title = "after sweep " + str(i) + ", with beta = " + str(args.beta)
             plt.title(title)
             plt.legend(loc=2)
-            plt.pause(0.05)
-        i += 1
-    
+            plt.pause(0.1)
+
+    plt.ioff()
+    plot_acf(history, max_lag=args.max_lag, mean_first=True, save=args.name)
+
 
 if __name__ == '__main__':
     main()
