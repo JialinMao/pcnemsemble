@@ -91,20 +91,12 @@ class Sampler(object):
                 ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
 
                 # propose a move
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('error')
-                    try:
-                        proposal, blob = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)
-                        if i == 0 and k == 0 and blob is not None and store:
-                            name_to_dim = dict([(key, blob[key].shape[1]) for key in blob.keys()])
-                            self.history.add_extra(name_to_dim)
-                        if store:
-                            self.history.update(i, idx, **blob)
-                    except Warning as e:
-                        print 'iteration: ', i
-                        print 'walker: ', idx
-                        print 'error found:', e
+                proposal, blob = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)
+                if i == 0 and k == 0 and blob is not None and store:
+                    name_to_dim = dict([(key, blob[key].shape[1]) for key in blob.keys()])
+                    self.history.add_extra(name_to_dim)
+                    if store:
+                        self.history.update(i, idx, **blob)
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
@@ -114,7 +106,7 @@ class Sampler(object):
                 ln_acc_prob = (proposal_lnprob + ln_transition_prob_1) - (curr_lnprob + ln_transition_prob_2)
 
                 # accept or reject
-                accept = (np.log(self._random.uniform(size=batch_size)) < ln_acc_prob)
+                accept = (self._random.uniform(size=batch_size) < np.exp(np.minimum(0, ln_acc_prob)))
                 if store:
                     self._history.update(i, idx, accepted=accept)
                 else:

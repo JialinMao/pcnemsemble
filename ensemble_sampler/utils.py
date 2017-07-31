@@ -15,6 +15,7 @@ __all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run', 'remove_f']
 
 
 def plot_acf(chain, max_lag=1000, mean_first=False, save=None):
+    # chain.shape = (nwalkers, niter, dim)
     dim = chain.shape[2]
     if mean_first:
         acf = function(np.mean(chain, axis=0))
@@ -33,6 +34,7 @@ def plot_acf(chain, max_lag=1000, mean_first=False, save=None):
     plt.show()
     if save is not None:
         plt.savefig(save)
+    return data
 
 
 def plot_hist(dim, history, start_from=None, normalize=False, show=False):
@@ -101,9 +103,6 @@ def run(dim, sampler, batch_size=50, niters=1000, n=5, pre=0, nwalkers=100,
 
 def remove_f(title, save_dir):
     import os
-    if title is None:
-        from datetime import datetime
-        title = datetime.now().strftime('%Y-%m-%d_%H:%M')
     f_name = os.path.join(save_dir, title + '.hdf5')
     try:
         os.remove(f_name)

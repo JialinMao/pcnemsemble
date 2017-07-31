@@ -125,18 +125,12 @@ class PCNWalkMove(Proposal):
         diff = ensemble - self.sample_mean
         C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
         self.precision = np.linalg.inv(C)
-        import warnings
-        with warnings.catch_warnings():
-            warnings.filterwarnings('error')
-            try:
-                proposal = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=1)
-            except Warning as e:
-                raise e
+        W = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=1)
 
-        new_pos = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * proposal
-        blobs = {'x': proposal, 'new_pos': new_pos}
+        proposal = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * W
+        blobs = {'W': W, 'proposal': proposal}
 
-        return new_pos, blobs
+        return proposal, blobs
 
     def ln_transition_prob(self, x, y):
         """
@@ -145,5 +139,6 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
-        diff = (y - np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean) - self.sample_mean) / self.beta
-        return - np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T)) / 2.0
+        mu = self.sample_mean + np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean)
+        diff = (y - mu) / self.beta
+        return - 0.5 * np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T))
