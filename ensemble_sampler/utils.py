@@ -17,15 +17,19 @@ __all__ = ['plot_hist', 'plot_trajectory', 'plot_acf', 'run', 'remove_f']
 def plot_acf(chain, max_lag=1000, mean_first=False, save=None):
     # chain.shape = (nwalkers, niter, dim)
     dim = chain.shape[2]
+    title = save
     if mean_first:
         acf = function(np.mean(chain, axis=0))
-        title = 'Mean of walkers first'
+        if save is None:
+            title = 'Mean of walkers first'
     else:
         acf = np.zeros_like(chain)
         for i in range(acf.shape[0]):
             acf[i] = function(chain[i])
         acf = np.mean(acf, axis=0)
-        title = 'Mean of acf'
+        if save is None:
+            title = 'Mean of acf'
+
     cols = ['dim_%s' % i for i in range(dim)]
     data = DataFrame(acf[:max_lag], columns=cols)
     ax = data.plot()

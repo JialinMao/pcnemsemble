@@ -9,25 +9,26 @@ def lnprob(x):
 def transition_ln_prob(x, y, ens_mean, icov, beta, mode):
     if mode == 'pcn':
         mu = ens_mean + np.sqrt(1 - beta ** 2) * (x - ens_mean)
-    elif mode == 'old':
-        mu = np.sqrt(1 - beta ** 2) * x
+        diff = np.expand_dims((y - mu) / beta, axis=0)
+        return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
     else:
         return 0.0
-    diff = np.expand_dims((y - mu) / beta, axis=0)
-    return -0.5 * np.einsum('ij, ji->i', diff, np.dot(icov, diff.T)).squeeze()
 
 
 def propose(curr_walker, ensemble, beta, dim, mode='pcn'):
+    """
+    supported mode: pcn, ens (use only ensemble), other (isotropic gaussian proposal)
+    """
     ens_mean = np.mean(ensemble, axis=0)
     ens_cov = np.atleast_2d(np.cov(ensemble.T))
     ens_icov = np.linalg.inv(ens_cov)
     W = np.random.multivariate_normal(np.atleast_1d(np.zeros(dim)), ens_cov)
     if mode == 'pcn':
         proposal = ens_mean + np.sqrt(1 - beta ** 2) * (curr_walker - ens_mean) + beta * W
-    elif mode == 'old':
-        proposal = np.sqrt(1 - beta ** 2) * curr_walker + beta * W
-    else:
+    elif mode == 'ens':
         proposal = curr_walker + beta * W
+    else:
+        proposal = curr_walker + beta * np.random.multivariate_normal(np.atleast_1d(np.zeros(dim)), np.identity(dim))
     trans_ln_prob_1 = transition_ln_prob(proposal, curr_walker, ens_mean, ens_icov, beta, mode)
     trans_ln_prob_2 = transition_ln_prob(curr_walker, proposal, ens_mean, ens_icov, beta, mode)
     return proposal, ens_icov, ens_mean, trans_ln_prob_1, trans_ln_prob_2

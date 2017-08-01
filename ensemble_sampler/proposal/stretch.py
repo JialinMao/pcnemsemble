@@ -14,7 +14,7 @@ class StretchMove(Proposal):
         """
         self.a = float(a)
         self.z = None
-        self.dim = None
+        self.dim = 2
         self.counter = 0
         super(Proposal, self).__init__()
 
@@ -30,7 +30,7 @@ class StretchMove(Proposal):
 
         new_pos = c_walkers + self.z * (walkers_to_move - c_walkers)
 
-        return new_pos
+        return new_pos, None
 
     def ln_transition_prob(self, x, y):
         """

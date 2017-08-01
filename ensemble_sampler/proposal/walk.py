@@ -91,7 +91,7 @@ class WalkMove(Proposal):
 
 class PCNWalkMove(Proposal):
 
-    def __init__(self, beta=0.4):
+    def __init__(self, beta=0.4, mode='pcn'):
         """
         Generate a Gaussian r.v. W_t ~ N(0, C), where C = cov(ensemble)
         Make a proposal using the strategy:
@@ -99,38 +99,38 @@ class PCNWalkMove(Proposal):
         """
         assert 0 <= beta <= 1, "beta must be in [0, 1]"
         self.beta = beta
+        self.mode = mode
         self.sample_mean = None
         self.precision = None
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
         """
-        :param walkers_to_move: 
-            position of the walker(s) to move, shape = (batch_size, dim)
-        :param ensemble: 
-            ensemble from which we can calculate the covariance matrix for proposal.
-            Should be array of shape (Nc, dim), where each row is an available walker.
-        :param random:
-            random number generator. Use default if None.
-    
-        :return: proposed move of shape (Nc, dim), extra info for debugging
+        walkers_to_move.shape = (batch_size, dim)
+        ensemble.shape = (Nc, dim)
         """
         rand = np.random.RandomState() if random is None else random
-
         beta = kwargs.get('beta', self.beta)
+        mode = kwargs.get('mode', self.mode)
 
+        B, _ = walkers_to_move.shape
         Nc, dim = ensemble.shape
 
-        self.sample_mean = np.mean(ensemble, axis=0)
-        diff = ensemble - self.sample_mean
-        C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
-        self.precision = np.linalg.inv(C)
-        W = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=1)
+        if mode == 'gaussian':
+            W = rand.multivariate_normal(mean=np.zeros(dim), cov=np.identity(dim), size=B)
+            proposal = walkers_to_move + beta * W
+        else:
+            self.sample_mean = np.mean(ensemble, axis=0)
+            diff = ensemble - self.sample_mean
+            C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
+            self.precision = np.linalg.inv(C)
+            W = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=B)
+            if mode == 'ensemble':
+                proposal = walkers_to_move + beta * W
+            else:
+                proposal = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * W
 
-        proposal = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * W
-        blobs = {'W': W, 'proposal': proposal}
-
-        return proposal, blobs
+        return proposal, None
 
     def ln_transition_prob(self, x, y):
         """
@@ -139,6 +139,9 @@ class PCNWalkMove(Proposal):
         :param y: end position, shape=(batch_size, dim) 
         :return: prob, shape=(batch_size, 1), extra info for debugging 
         """
-        mu = self.sample_mean + np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean)
-        diff = (y - mu) / self.beta
-        return - 0.5 * np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T))
+        if self.mode == 'pcn':
+            mu = self.sample_mean + np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean)
+            diff = (y - mu) / self.beta
+            return - 0.5 * np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T))
+        else:
+            return 0.0

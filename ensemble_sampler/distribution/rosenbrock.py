@@ -22,6 +22,4 @@ class Rosenbrock(Distribution):
         x_1, x_2 = x[:, 0], x[:, 1]
         return -(self.a * (x_2 - x_1 ** 2) ** 2 + (1.0 - x_1) ** 2) / self.b
 
-    def get_auto_corr_f(self, chain):
-        return chain
 

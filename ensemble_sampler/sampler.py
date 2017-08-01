@@ -16,52 +16,34 @@ class Sampler(object):
         :param proposal: proposal method
         :param nwalkers: number of walkers to use for sampling, default set to 1 for non-ensemble methods.
         """
-        self.dim = t_dist.dim
         self.nwalkers = nwalkers
         self.t_dist = t_dist
+        self.dim = t_dist.dim
         self.proposal = proposal
 
         self._history = History(dim=self.dim, nwalkers=nwalkers)
         self._random = np.random.RandomState()
         self._visualizer = visualizer
 
-    def sample(self, niter, batch_size=1, p0=None, rstate0=None,
-               store=False, store_every=None, save_dir='./results', title='', **kwargs):
+    def sample(self, niter, batch_size=None, p0=None, rstate0=None,
+               store=True, store_every=None, save_dir='./results', title='test', **kwargs):
         """
-        Sampling function, yields position, ln_prob and accepted or not every iteration, 
-        or saves to hdf5 file every `store_every` iterations if store=True.
-
-        :param niter:
-            The number of steps to run.
-        :param batch_size:
-            In each iteration move `batch_size` walkers simultaneously using all other walkers as ensemble.
-        :param p0:
-            The initial position vector.  Can also be None to resume from where :func:``run_mcmc`` left off 
-            the last time it executed.
-        :param rstate0:
-            The initial random state. Use default if None.
-        :param store:
-            Store chain if True, otherwise discard chain and yield results every iteration.
-        :param store_every:
-            How often to save chain to file and free-up memory. Store the entire chain if None.
-        :param save_dir:
-            The directory to save history. 
-        :param title:
-            Title of the saved file.
-        :param kwargs:
-            Optional keywords arguments for proposal / calculating lnprob.
+        If store == True, return whole history after the run is over, save to hdf5 file every `store_every`
+        iterations to avoid memory error.
+        If store == False, yields position, ln_prob and accepted or not every iteration.
         """
         if rstate0 is not None:
             self._random.set_state(rstate0)
 
+        batch_size = batch_size or self.nwalkers // 2
         assert self.nwalkers % batch_size == 0, 'Batch size must divide number of walkers.'
 
+        store_every = store_every or niter
         self._history.niter = niter
-        self._history.max_len = niter if store_every is None else store_every
+        self._history.max_len = store_every
 
         if store:
-            # Remove file if already exist
-            remove_f(title, save_dir)
+            remove_f(title, save_dir)  # Remove file if already exist
 
         if self._history.curr_pos is None:
             if kwargs.get('random_start'):
@@ -79,24 +61,24 @@ class Sampler(object):
         for i in xrange(niter):
             if store:
                 self._history.update(itr=i, chain=self._history.curr_pos)
-                if store_every is not None and (i+1) % store_every == 0:
-                    self._history.save_to(save_dir, title)
-
             for k in xrange(n):
                 # pick walkers to move
                 idx = slice(k * batch_size, (k+1) * batch_size)
-                curr_walker = all_walkers[idx]  # (batch_size, dim)
-                ens_idx = np.zeros(self.nwalkers)
-                ens_idx[idx] = -1
-                ensemble = all_walkers[ens_idx >= 0]  # (Nc, dim)
+                curr_walker = all_walkers[idx].copy()  # (batch_size, dim)
+                if k == 0:
+                    ensemble = all_walkers[batch_size:]
+                elif k == n-1:
+                    ensemble = all_walkers[:k * batch_size]
+                else:
+                    ensemble = np.vstack([all_walkers[:k*batch_size], all_walkers[(k+1)*batch_size:]])
 
                 # propose a move
                 proposal, blob = self.proposal.propose(curr_walker, ensemble, self._random, **kwargs)
-                if i == 0 and k == 0 and blob is not None and store:
+                if blob is not None and store and i == 0 and k == 0:
                     name_to_dim = dict([(key, blob[key].shape[1]) for key in blob.keys()])
-                    self.history.add_extra(name_to_dim)
+                    self._history.add_extra(name_to_dim)
                     if store:
-                        self.history.update(i, idx, **blob)
+                        self._history.update(i, idx, **blob)
 
                 # calculate acceptance probability
                 curr_lnprob = ln_probs[idx]  # (batch_size, )
@@ -108,14 +90,17 @@ class Sampler(object):
                 # accept or reject
                 accept = (self._random.uniform(size=batch_size) < np.exp(np.minimum(0, ln_acc_prob)))
                 if store:
-                    self._history.update(i, idx, accepted=accept)
+                    self._history.update(i, idx, accepted=np.expand_dims(accept, 1))
                 else:
-                    yield self._history.curr_pos, proposal, accept
+                    yield curr_walker, ensemble, proposal, accept
 
                 # update history records for next iteration
                 self._history.move(walker_idx=np.arange(idx.start, idx.stop)[accept], new_pos=proposal[accept])
                 all_walkers = self._history.curr_pos
                 ln_probs[idx][accept] = proposal_lnprob[accept]
+
+            if store and store_every is not None and (i+1) % store_every == 0:
+                self._history.save_to(save_dir, title)
 
     def run_mcmc(self, niter, **kwargs):
         for h in self.sample(niter, **kwargs):
@@ -151,10 +136,17 @@ class Sampler(object):
         chain = self.t_dist.get_auto_corr_f(np.mean(self._history.get('chain'), axis=0))
         return integrated_time(chain, axis=0, low=low, high=high, step=step, c=c, fast=fast)
 
-
     @property
     def history(self):
         return self._history
+
+    @property
+    def chain(self):
+        return self._history.get('chain')
+
+    @property
+    def acceptance_rate(self):
+        return np.sum(self._history.get('accepted'), axis=1) / float(self._history.niter)
 
     @property
     def random_state(self):
@@ -163,19 +155,3 @@ class Sampler(object):
     @random_state.setter
     def random_state(self, state):
         self._random.set_state(state)
-
-    @property
-    def acceptance(self):
-        return self._acceptances
-
-    @property
-    def accepted(self):
-        return self._accepted
-
-    @property
-    def visualizer(self):
-        return self._visualizer
-
-    @visualizer.setter
-    def visualizer(self, vis):
-        self._visualizer = vis

@@ -25,7 +25,7 @@ class Distribution(object):
             raise NotImplementedError
 
     def get_auto_corr_f(self, chain):
-        raise NotImplementedError
+        return chain
 
     def set(self, k, v):
         self.args[k] = v

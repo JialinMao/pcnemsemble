@@ -33,6 +33,3 @@ class MultivariateGaussian(Distribution):
         diff = x - self._mu
         # return -np.diag(np.dot(diff, np.dot(self._icov, diff.T))) / 2.0
         return - np.einsum('ij, ji->i', diff, np.dot(self._icov, diff.T)) / 2.0
-
-    def get_auto_corr_f(self, chain):
-        return chain
