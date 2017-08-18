@@ -4,8 +4,6 @@ Rosenbrock distribution.
 from __future__ import division
 from distribution import Distribution
 
-__all__ = ['Rosenbrock']
-
 
 class Rosenbrock(Distribution):
     def __init__(self, a=100.0, b=20.0):

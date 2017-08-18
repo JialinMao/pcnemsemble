@@ -1,13 +1,12 @@
-import sys
 import numpy as np
 from proposal import Proposal
 
-__all__ = ['PCNWalkMove']
+__all__ = ['Walk']
 
 
-class PCNWalkMove(Proposal):
+class Walk(Proposal):
 
-    def __init__(self, beta=0.4, mode='pcn'):
+    def __init__(self, beta=0.4):
         """
         Generate a Gaussian r.v. W_t ~ N(0, C), where C = cov(ensemble)
         Make a proposal using the strategy:
@@ -15,7 +14,6 @@ class PCNWalkMove(Proposal):
         """
         assert 0 <= beta <= 1, "beta must be in [0, 1]"
         self.beta = beta
-        self.mode = mode
         self.sample_mean = None
         self.precision = None
         super(Proposal, self).__init__()
@@ -27,37 +25,15 @@ class PCNWalkMove(Proposal):
         """
         rand = np.random.RandomState() if random is None else random
         beta = kwargs.get('beta', self.beta)
-        mode = kwargs.get('mode', self.mode)
 
         B, _ = walkers_to_move.shape
         Nc, dim = ensemble.shape
 
-        if mode == 'gaussian':
-            W = rand.multivariate_normal(mean=np.zeros(dim), cov=np.identity(dim), size=B)
-            proposal = walkers_to_move + beta * W
-        else:
-            self.sample_mean = np.mean(ensemble, axis=0)
-            diff = ensemble - self.sample_mean
-            C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
-            self.precision = np.linalg.inv(C)
-            W = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=B)
-            if mode == 'ensemble':
-                proposal = walkers_to_move + beta * W
-            else:
-                proposal = self.sample_mean + np.sqrt(1 - beta ** 2) * (walkers_to_move - self.sample_mean) + beta * W
+        self.sample_mean = np.mean(ensemble, axis=0)
+        diff = ensemble - self.sample_mean
+        C = 1.0 / (Nc - 1) * np.dot(diff.T, diff)
+        self.precision = np.linalg.inv(C)
+        W = rand.multivariate_normal(mean=np.zeros(dim), cov=C, size=B)
+        proposal = walkers_to_move + beta * W
 
         return proposal, None
-
-    def ln_transition_prob(self, x, y):
-        """
-        Calculate ln transition probability from x -> y
-        :param x: start position, shape=(batch_size, dim) 
-        :param y: end position, shape=(batch_size, dim) 
-        :return: prob, shape=(batch_size, 1), extra info for debugging 
-        """
-        if self.mode == 'pcn':
-            mu = self.sample_mean + np.sqrt(1 - self.beta ** 2) * (x - self.sample_mean)
-            diff = (y - mu) / self.beta
-            return - 0.5 * np.einsum('ij, ji->i', diff, np.dot(self.precision, diff.T))
-        else:
-            return 0.0
