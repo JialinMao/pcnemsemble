@@ -30,6 +30,6 @@ class MultivariateGaussian(Distribution):
         super(MultivariateGaussian, self).__init__(mu=mu, icov=icov)
 
     def get_lnprob(self, x):
-        diff = x - self._mu
+        diff = np.atleast_2d(x - self._mu)
         # return -np.diag(np.dot(diff, np.dot(self._icov, diff.T))) / 2.0
         return - np.einsum('ij, ji->i', diff, np.dot(self._icov, diff.T)) / 2.0

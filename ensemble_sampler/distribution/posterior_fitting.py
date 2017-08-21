@@ -28,7 +28,7 @@ class LogPosterior(Distribution):
 
 
 class FlatPrior(object):
-    def __init__(self, A_max, l_max, s_max):
+    def __init__(self, A_max=50, l_max=50, s_max=50):
         self.A_max = A_max
         self.l_max = l_max
         self.s_max = s_max

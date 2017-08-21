@@ -13,6 +13,7 @@ class Exponential(Distribution):
         super(Exponential, self).__init__(dim=dim)
 
     def get_lnprob(self, x):
+        x = np.atleast_2d(x)
         prob = -np.sum(x, axis=1)
         prob[np.any(x < 0, axis=1)] = -np.inf
         return prob
