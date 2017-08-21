@@ -1,5 +1,6 @@
 from proposal import Proposal
-from walk import PCNWalkMove
-from stretch import StretchMove
+from gaussian import Gaussian
+from pcnwalk import PCNWalk
+from stretch import Stretch
+from walk import Walk
 
-__all__ = ['Proposal', 'StretchMove', 'PCNWalkMove']

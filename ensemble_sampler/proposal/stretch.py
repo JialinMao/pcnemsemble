@@ -1,12 +1,12 @@
 import numpy as np
 from proposal import Proposal
 
-__all__ = ['StretchMove']
+__all__ = ['Stretch']
 
 
-class StretchMove(Proposal):
+class Stretch(Proposal):
 
-    def __init__(self, a):
+    def __init__(self, a, **kwargs):
         """
         Propose a stretch move.
         :param a:
@@ -19,15 +19,14 @@ class StretchMove(Proposal):
         super(Proposal, self).__init__()
 
     def propose(self, walkers_to_move, ensemble, random=None, *args, **kwargs):
+
         rand = np.random.RandomState() if random is None else random
         n, self.dim = walkers_to_move.shape
         m = ensemble.shape[0]
 
-        available_idx = np.arange(m)
-        c_walkers = ensemble[rand.choice(available_idx, n)]
+        self.z = ((self.a - 1.0) * rand.uniform(size=[n, 1]) + 1.0) ** 2. / self.a
 
-        self.z = ((self.a - 1.0) * rand.uniform(size=[n, 1]) + 1.0) ** 2 / self.a
-
+        c_walkers = ensemble[rand.randint(m, size=(n, ))]
         new_pos = c_walkers + self.z * (walkers_to_move - c_walkers)
 
         return new_pos, None

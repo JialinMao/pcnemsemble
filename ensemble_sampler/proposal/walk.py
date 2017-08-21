@@ -6,7 +6,7 @@ __all__ = ['Walk']
 
 class Walk(Proposal):
 
-    def __init__(self, beta=0.4):
+    def __init__(self, beta=0.4, **kwargs):
         """
         Generate a Gaussian r.v. W_t ~ N(0, C), where C = cov(ensemble)
         Make a proposal using the strategy:

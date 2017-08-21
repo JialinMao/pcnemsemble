@@ -9,7 +9,7 @@ __all__ = ['Gaussian']
 
 class Gaussian(Proposal):
 
-    def __init__(self, beta=0.4):
+    def __init__(self, beta=0.4, **kwargs):
         assert 0 <= beta <= 1, "beta must be in [0, 1]"
         self.beta = beta
         super(Proposal, self).__init__()
