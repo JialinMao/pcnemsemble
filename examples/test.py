@@ -53,10 +53,7 @@ def main():
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
-    if args.distribution == 'fitting':
-        dim = args.dim * 2 + 1
-    else:
-        dim = args.dim
+    dim = args.dim
 
     n_ = args.steps if args.vary is not None else 1
     proposals = SUPPORTED_PROPOSAL if args.mode is None else args.mode
@@ -149,29 +146,26 @@ def main():
 
     col = values[args.vary] if args.vary is not None else [''.join(['%s_%s_' % (k, values[k][0]) for k in values.keys()])]
     df_act = pd.DataFrame(act_info.reshape([k_, -1]), index=proposals,
-                          columns=pd.MultiIndex.from_tuples(zip(np.repeat(col, 2), np.array(['mean', 'cov'] * n_))))
+                          columns=pd.MultiIndex.from_tuples(zip(np.repeat(col, 2), np.array(['mean', 'cov'] * n_)),
+                                                            names=[args.vary, 'act']))
     df_accept = pd.DataFrame(accept_info, index=proposals, columns=col)
     f_dir = args.save_dir + '/plot_info'
-    f_name = args.vary+args.suffix if args.vary is not None else args.suffix
-    import ipdb; ipdb.set_trace()
+    f_name = '_'+args.vary+args.suffix if args.vary is not None else args.suffix
     df_act.to_pickle(os.path.join(f_dir, 'act%s.pkl' % f_name))
     df_accept.to_pickle(os.path.join(f_dir, 'accept%s.pkl' % f_name))
 
     if args.plot:
         assert args.vary is not None, 'Nothing to plot'
         if args.vary == 'nwalkers':
-            fig_title = "beta=%s, dim=%s, changing number of walkers" % (args.beta, args.dim)
+            fig_title = "beta=%s, dim=%s, t_dist=%s, changing number of walkers" % (args.beta, args.dim, args.distribution)
         elif args.vary == 'beta':
-            fig_title = "nwalkers=%s, dim=%s, changing beta" % (args.nwalkers, args.dim)
+            fig_title = "nwalkers=%s, dim=%s, t_dist=%s, changing beta" % (args.nwalkers, args.dim, args.distribution)
         elif args.vary == 'dim':
-            fig_title = "nwalkers / dim=%s, beta=%s, changing dimension" % (args.ens_dim_ratio, args.beta)
+            fig_title = "nwalkers / dim=%s, beta=%s, t_dist=%s, changing dimension" % (args.ens_dim_ratio, args.beta, args.distribution)
 
         fig = plt.figure(facecolor='white')
         for i in range(k_):
-            if args.mode is None:
-                p = SUPPORTED_PROPOSAL[i]
-            else:
-                p = args.mode[i]
+            p = proposals[i]
             idx = act_info[i, :, 0] != 0
             if sum(idx) > 0:
                 plt.errorbar(values[args.vary][idx], act_info[i, :, 0][idx], yerr=act_info[i, :, 1][idx],
@@ -189,7 +183,7 @@ def main():
 
         if args.plot_accept:
             for i in range(k_):
-                p = args.mode or SUPPORTED_PROPOSAL[i]
+                p = proposals[i]
                 plt.plot(values[args.vary], accept_info[i, :], label=p)
 
             plt.grid(False)
